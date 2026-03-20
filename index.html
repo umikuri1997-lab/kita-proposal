@@ -26,11 +26,10 @@ const {useState,useRef,useEffect,useCallback}=React;
 /* ★★★ ここを書き換える ★★★ */
 const WORKER_URL="https://kita-proposal-api.kitahousing.workers.dev";
 
-/* ━━━ API（スタッフ操作はAPIキー付き） ━━━ */
+/* ━━━ API ━━━ */
 const AK="kita_api_key";
 function getKey(){return localStorage.getItem(AK)||"";}
 function setKey(k){localStorage.setItem(AK,k);}
-
 async function api(path,{method="GET",body,auth=false}={}){
   const h={"Content-Type":"application/json"};
   if(auth)h["X-API-Key"]=getKey();
@@ -43,7 +42,7 @@ async function api(path,{method="GET",body,auth=false}={}){
   return res.json();
 }
 const saveP=(id,data)=>api(`/api/proposals/${id}`,{method:"POST",body:{data},auth:true});
-const loadP=(id)=>api(`/api/proposals/${id}`); // 認証不要
+const loadP=(id)=>api(`/api/proposals/${id}`);
 const listP=()=>api("/api/proposals",{auth:true});
 const delP=(id)=>api(`/api/proposals/${id}`,{method:"DELETE",auth:true});
 
@@ -51,58 +50,33 @@ const delP=(id)=>api(`/api/proposals/${id}`,{method:"DELETE",auth:true});
 const mkFloor=(l)=>({label:l,image:null,rooms:[{name:"",size:""}]});
 const mkView=(l,t)=>({label:l,image:null,tag:t||""});
 const mkExt=(l)=>({label:l,image:null});
-const DEFAULT={customerName:"",staffName:"",planTitle:"新築住宅プラン",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{type:"4LDK ＋ WIC ＋ SIC",area:"112.62",tsubo:"34.06",floors:[{label:"1F",image:null,rooms:[{name:"LDK",size:"18.5"},{name:"和室",size:"4.5"},{name:"玄関",size:"3.0"}]},{label:"2F",image:null,rooms:[{name:"主寝室",size:"8.0"},{name:"子ども部屋①",size:"6.0"},{name:"子ども部屋②",size:"6.0"}]}]},exterior:{description:"シンプルモダンの外観に、木目調アクセントで温かみをプラス。",views:[{label:"正面",image:null},{label:"南東",image:null},{label:"夜景",image:null}]},interior:{description:"無垢材のフローリングとホワイトの壁を基調に、上質で落ち着いた空間を演出。",views:[{label:"LDK 全景",image:null,tag:"1F"},{label:"キッチン",image:null,tag:"1F"},{label:"主寝室",image:null,tag:"2F"},{label:"洗面室",image:null,tag:"1F"}]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
+const DEFAULT={customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{type:"4LDK ＋ WIC ＋ SIC",area:"112.62",tsubo:"34.06",floors:[{label:"1F",image:null,rooms:[{name:"LDK",size:"18.5"},{name:"和室",size:"4.5"},{name:"玄関",size:"3.0"}]},{label:"2F",image:null,rooms:[{name:"主寝室",size:"8.0"},{name:"子ども部屋①",size:"6.0"},{name:"子ども部屋②",size:"6.0"}]}]},exterior:{description:"シンプルモダンの外観に、木目調アクセントで温かみをプラス。",views:[{label:"正面",image:null},{label:"南東",image:null},{label:"夜景",image:null}]},interior:{description:"無垢材のフローリングとホワイトの壁を基調に、上質で落ち着いた空間を演出。",views:[{label:"LDK 全景",image:null,tag:"1F"},{label:"キッチン",image:null,tag:"1F"},{label:"主寝室",image:null,tag:"2F"},{label:"洗面室",image:null,tag:"1F"}]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
 const RC=["#C4956A","#7A9B6D","#6D7F9B","#9B6D8A","#9B8A6D","#6D9B93","#8A6D9B","#9B7A6D","#6D8A7A","#9B6D6D","#7A6D9B","#6D9B8A","#9B916D","#6D819B","#9B6D7A","#7A9B86","#916D9B","#9B866D","#6D9B7A","#8A9B6D"];
 const GR=["#A0896D,#C4B5A0","#6B8F71,#8BA893","#7E8B9A,#9AABB8","#9A8B7E,#B8A99A","#8B7A9B,#A899B8"];
 const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(let i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
 
+/* ━━━ Shared Helpers ━━━ */
+function useImg(cb){const r=useRef(null);const el=<input ref={r} type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>cb(ev.target.result);rd.readAsDataURL(f);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el};}
+function up(sd,p,v){sd(prev=>{const n=JSON.parse(JSON.stringify(prev));const k=p.split(".");let o=n;for(let i=0;i<k.length-1;i++)o=/^\d+$/.test(k[i])?o[+k[i]]:o[k[i]];const l=k[k.length-1];o[/^\d+$/.test(l)?+l:l]=v;return n;});}
+function Sh({children,full}){return<div style={{...S.shell,maxWidth:full?"none":"640px"}}>{children}</div>;}
+function PSec({children,bg,last}){return<div style={{padding:last?"72px 5vw 80px":"72px 5vw",background:bg}}><div style={{maxWidth:800,margin:"0 auto"}}>{children}</div></div>;}
+function Sec({children,bg,last}){return<div style={{padding:last?"72px 28px 80px":"72px 28px",background:bg}}>{children}</div>;}
+function Lb({en,ja,dark,center}){return<div style={{marginBottom:24,textAlign:center?"center":"left"}}><div style={{fontSize:10,letterSpacing:5,color:dark?"rgba(196,149,106,0.45)":"#A09890",fontWeight:500}}>{en}</div><div style={{fontSize:14,letterSpacing:3,color:dark?"rgba(255,255,255,0.8)":"#2C2420",fontWeight:300,marginTop:5}}>{ja}</div><div style={{width:22,height:1,background:"#C4956A",marginTop:14,marginLeft:center?"auto":0,marginRight:center?"auto":0}}/></div>;}
+function FS({t,children}){return<div><div style={{fontSize:14,fontWeight:600,color:"#2C2420",letterSpacing:1,marginBottom:20}}>{t}</div>{children}</div>;}
+function Fi({l,v,s,p,m,rows=2,type}){return<div style={{marginBottom:14}}><div style={S.fl}>{l}</div>{m?<textarea value={v} onChange={e=>s(e.target.value)} placeholder={p} rows={rows} style={{...S.inp,resize:"vertical",minHeight:rows*24}}/>:<input type={type||"text"} value={v} onChange={e=>s(e.target.value)} placeholder={p} style={S.inp}/>}</div>;}
+function ImgS({src,go,cl,tall,small}){if(src)return<div style={{position:"relative",marginBottom:6}}><img src={src} alt="" style={{width:"100%",borderRadius:8,display:"block",maxHeight:tall?200:small?90:140,objectFit:"cover"}}/><button onClick={cl} style={{position:"absolute",top:5,right:5,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>;return<button onClick={go} style={{width:"100%",height:tall?120:small?56:88,border:"1.5px dashed #D5D0CA",borderRadius:8,background:"#FAFAF8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5AFA8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span style={{fontSize:10,color:"#A09890"}}>画像を選択</span></button>;}
+
 /* ━━━ App ━━━ */
 function App(){
-  const[mode,setMode]=useState("loading");
-  const[data,setData]=useState(DEFAULT);
-  const[tab,setTab]=useState("basic");
-  const[lb,setLb]=useState(null);
-  const[shareId,setShareId]=useState(null);
-  const[err,setErr]=useState(null);
-
+  const[mode,setMode]=useState("loading");const[data,setData]=useState(DEFAULT);const[tab,setTab]=useState("basic");const[lb,setLb]=useState(null);const[shareId,setShareId]=useState(null);const[err,setErr]=useState(null);
   useEffect(()=>{
-    const hash=location.hash.replace("#","");
-    const params=new URLSearchParams(location.search);
-    // お客様ビュー: ?v=1#CODE
-    if(hash&&hash.length>=4&&params.get("v")==="1"){
-      loadP(hash).then(row=>{
-        if(row?.data){setData(row.data);setMode("customer");}
-        else setMode("login");
-      }).catch(()=>setMode("login"));
-      return;
-    }
-    // スタッフ: APIキーがあるか
-    if(getKey()){
-      if(hash&&hash.length>=4){
-        loadP(hash).then(row=>{
-          if(row?.data){setData(row.data);setShareId(hash);}
-          setMode("edit");
-        }).catch(()=>setMode("edit"));
-      } else setMode("edit");
-    } else setMode("login");
+    const hash=location.hash.replace("#","");const params=new URLSearchParams(location.search);
+    if(hash&&hash.length>=4&&params.get("v")==="1"){loadP(hash).then(row=>{if(row?.data){setData(row.data);setMode("customer");}else setMode("login");}).catch(()=>setMode("login"));return;}
+    if(getKey()){if(hash&&hash.length>=4){loadP(hash).then(row=>{if(row?.data){setData(row.data);setShareId(hash);}setMode("edit");}).catch(()=>setMode("edit"));}else setMode("edit");}else setMode("login");
   },[]);
-
-  const handleLogin=async(key)=>{
-    setKey(key);
-    try{await listP();setMode("edit");}
-    catch(e){setKey("");throw e;}
-  };
-
-  const handleSave=async()=>{
-    const id=shareId||genId();
-    try{await saveP(id,data);setShareId(id);return id;}
-    catch(e){setErr(e.message);return null;}
-  };
-
-  const handleLoad=async(id)=>{
-    try{const row=await loadP(id);if(row?.data){setData(row.data);setShareId(id);setMode("edit");}}
-    catch(e){setErr(e.message);}
-  };
+  const handleLogin=async(key)=>{setKey(key);try{await listP();setMode("edit");}catch(e){setKey("");throw e;}};
+  const handleSave=async()=>{const id=shareId||genId();try{await saveP(id,data);setShareId(id);return id;}catch(e){setErr(e.message);return null;}};
+  const handleLoad=async(id)=>{try{const row=await loadP(id);if(row?.data){setData(row.data);setShareId(id);setMode("edit");}}catch(e){setErr(e.message);}};
 
   if(mode==="loading")return<Sh full><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{color:"#A09890",fontSize:13,letterSpacing:2}}>読み込み中...</p></div></Sh>;
   if(mode==="login")return<Login onDone={handleLogin}/>;
@@ -116,43 +90,24 @@ function App(){
   </>;
 }
 
-/* ━━━ Login（APIキー入力、初回のみ） ━━━ */
-function Login({onDone}){
-  const[key,setKeyV]=useState("");const[testing,setTesting]=useState(false);const[err,setErr]=useState(null);
-  const go=async()=>{
-    setTesting(true);setErr(null);
-    try{await onDone(key);}catch(e){setErr(e.message);}
-    setTesting(false);
-  };
-  return<Sh><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-    <div style={{width:"100%",maxWidth:360}}>
-      <div style={{textAlign:"center",marginBottom:40}}>
-        <div style={{fontSize:10,letterSpacing:5,color:"#A09890",marginBottom:8}}>KITA HOUSING</div>
-        <div style={{fontSize:20,fontWeight:300,color:"#2C2420",letterSpacing:2}}>提案書ツール</div>
-        <div style={{width:30,height:1,background:"#C4956A",margin:"16px auto"}}/>
-      </div>
-      <div style={{background:"#fff",borderRadius:12,padding:24}}>
-        <div style={{fontSize:14,fontWeight:600,color:"#2C2420",marginBottom:16}}>スタッフログイン</div>
-        <Fi l="APIキー" v={key} s={setKeyV} p="キーを入力" type="password"/>
-        {err&&<div style={{padding:12,background:"#FFF0F0",borderRadius:8,fontSize:11,color:"#C44",marginBottom:12}}>{err}</div>}
-        <button onClick={go} disabled={!key||testing} style={{width:"100%",padding:"14px 0",background:key?"#2C2420":"#E5E0DA",color:key?"#fff":"#A09890",border:"none",borderRadius:8,fontSize:13,fontWeight:500,cursor:key?"pointer":"default",letterSpacing:1}}>{testing?"確認中...":"ログイン"}</button>
-      </div>
-    </div>
-  </div></Sh>;
+/* ━━━ Login ━━━ */
+function Login({onDone}){const[key,setKeyV]=useState("");const[testing,setTesting]=useState(false);const[err,setErr]=useState(null);
+  const go=async()=>{setTesting(true);setErr(null);try{await onDone(key);}catch(e){setErr(e.message);}setTesting(false);};
+  return<Sh><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}><div style={{width:"100%",maxWidth:360}}>
+    <div style={{textAlign:"center",marginBottom:40}}><div style={{fontSize:10,letterSpacing:5,color:"#A09890",marginBottom:8}}>KITA HOUSING</div><div style={{fontSize:20,fontWeight:300,color:"#2C2420",letterSpacing:2}}>提案書ツール</div><div style={{width:30,height:1,background:"#C4956A",margin:"16px auto"}}/></div>
+    <div style={{background:"#fff",borderRadius:12,padding:24}}><div style={{fontSize:14,fontWeight:600,color:"#2C2420",marginBottom:16}}>スタッフログイン</div><Fi l="APIキー" v={key} s={setKeyV} p="キーを入力" type="password"/>{err&&<div style={{padding:12,background:"#FFF0F0",borderRadius:8,fontSize:11,color:"#C44",marginBottom:12}}>{err}</div>}<button onClick={go} disabled={!key||testing} style={{width:"100%",padding:"14px 0",background:key?"#2C2420":"#E5E0DA",color:key?"#fff":"#A09890",border:"none",borderRadius:8,fontSize:13,fontWeight:500,cursor:key?"pointer":"default",letterSpacing:1}}>{testing?"確認中...":"ログイン"}</button></div>
+  </div></div></Sh>;
 }
 
 /* ━━━ List ━━━ */
-function LS({onLoad,onBack}){
-  const[list,setList]=useState([]);const[ld,setLd]=useState(true);
+function LS({onLoad,onBack}){const[list,setList]=useState([]);const[ld,setLd]=useState(true);
   useEffect(()=>{listP().then(r=>{setList(r||[]);setLd(false);}).catch(()=>setLd(false));},[]);
-  return<>
-    <div style={S.eH}><button onClick={onBack} style={{background:"none",border:"none",color:"#2C2420",fontSize:13,cursor:"pointer"}}>◀ 戻る</button><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>保存済み提案書</div><div style={{width:48}}/></div>
+  return<><div style={S.eH}><button onClick={onBack} style={{background:"none",border:"none",color:"#2C2420",fontSize:13,cursor:"pointer"}}>◀ 戻る</button><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>保存済み提案書</div><div style={{width:48}}/></div>
     <div style={S.eB}>{ld&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>読み込み中...</div>}{!ld&&list.length===0&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>提案書はありません</div>}{list.map(it=><div key={it.id} style={{padding:16,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
       <div style={{flex:1}}><div style={{fontSize:14,color:"#2C2420",fontWeight:500}}>{it.customerName||"未設定"} 様</div><div style={{fontSize:11,color:"#A09890",marginTop:3}}>{it.planTitle} <span style={{fontFamily:"monospace",fontSize:10}}>#{it.id}</span></div></div>
       <button onClick={()=>onLoad(it.id)} style={{background:"#2C2420",color:"#fff",border:"none",borderRadius:6,padding:"8px 14px",fontSize:11,cursor:"pointer"}}>開く</button>
       <button onClick={async()=>{if(confirm("削除?")){{await delP(it.id).catch(()=>{});setList(l=>l.filter(x=>x.id!==it.id));}}}} style={{background:"none",border:"none",color:"#CCC5BE",fontSize:16,cursor:"pointer"}}>✕</button>
-    </div>)}</div>
-  </>;
+    </div>)}</div></>;
 }
 
 /* ━━━ Editor ━━━ */
@@ -164,10 +119,7 @@ function Ed({data,setData,tab,setTab,onPv,sid:shareId,onSave,onLoad,onNew,onList
   const doSave=async()=>{setSaving(true);const id=await onSave();if(id){setSid(id);setShowSh(true);}setSaving(false);};
   const shareUrl=sid?`${location.origin}${location.pathname}?v=1#${sid}`:"";
   return<>
-    <div style={{...S.eH,flexWrap:"wrap",gap:8}}>
-      <div style={{flex:1,minWidth:100}}><div style={{fontSize:10,letterSpacing:3,color:"#A09890",marginBottom:2}}>KITA HOUSING</div><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>提案書作成</div></div>
-      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}><button onClick={onNew} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>新規</button><button onClick={onList} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>一覧</button><button onClick={doSave} disabled={saving} style={{...S.smB,background:"#C4956A",color:"#fff"}}>{saving?"...":"保存"}</button><button onClick={onPv} style={{...S.smB,background:"#2C2420",color:"#fff"}}>▶</button></div>
-    </div>
+    <div style={{...S.eH,flexWrap:"wrap",gap:8}}><div style={{flex:1,minWidth:100}}><div style={{fontSize:10,letterSpacing:3,color:"#A09890",marginBottom:2}}>KITA HOUSING</div><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>提案書作成</div></div><div style={{display:"flex",gap:5,flexWrap:"wrap"}}><button onClick={onNew} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>新規</button><button onClick={onList} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>一覧</button><button onClick={doSave} disabled={saving} style={{...S.smB,background:"#C4956A",color:"#fff"}}>{saving?"...":"保存"}</button><button onClick={onPv} style={{...S.smB,background:"#2C2420",color:"#fff"}}>▶</button></div></div>
     {showSh&&sid&&<ShMdl url={shareUrl} id={sid} onClose={()=>setShowSh(false)}/>}
     {err&&<div style={{padding:"10px 16px",background:"#FFF0F0",fontSize:11,color:"#C44",display:"flex",justifyContent:"space-between"}}><span>{err}</span><button onClick={()=>setErr(null)} style={{background:"none",border:"none",color:"#C44",cursor:"pointer"}}>✕</button></div>}
     <div style={S.tB}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...S.tI,color:tab===t.id?"#2C2420":"#A09890",borderBottom:tab===t.id?"2px solid #C4956A":"2px solid transparent",fontWeight:tab===t.id?600:400}}>{t.l}</button>)}</div>
@@ -187,79 +139,84 @@ function ShMdl({url,id,onClose}){const[cp,setCp]=useState(false);const copy=asyn
   </div></div>;
 }
 
+/* ━━━ Editor Tabs ━━━ */
+function EBas({d,u}){const img=useImg(b=>u("coverImage",b));return<FS t="基本情報"><Fi l="お客様名" v={d.customerName} s={v=>u("customerName",v)} p="例：山田 太郎"/><Fi l="担当者名" v={d.staffName} s={v=>u("staffName",v)}/><Fi l="プランタイトル" v={d.planTitle} s={v=>u("planTitle",v)}/><div style={{marginTop:8}}/><div style={S.fl}>カバー画像</div><ImgS src={d.coverImage} go={img.go} cl={()=>u("coverImage",null)} tall/>{img.el}</FS>;}
+
+function ECon({d,u}){return<FS t="コンセプト"><Fi l="キャッチコピー" v={d.concept.headline} s={v=>u("concept.headline",v)} m/><Fi l="説明文" v={d.concept.body} s={v=>u("concept.body",v)} m rows={4}/><div style={S.fl}>キーワード</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{d.concept.tags.map((t,i)=><input key={i} value={t} onChange={e=>{const a=[...d.concept.tags];a[i]=e.target.value;u("concept.tags",a);}} style={S.inp}/>)}</div></FS>;}
+
+function EPla({d,u}){return<FS t="間取り"><Fi l="タイプ" v={d.plan.type} s={v=>u("plan.type",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Fi l="㎡" v={d.plan.area} s={v=>u("plan.area",v)}/><Fi l="坪" v={d.plan.tsubo} s={v=>u("plan.tsubo",v)}/></div>{d.plan.floors.map((fl,fi)=><FE key={fi} fl={fl} fi={fi} d={d} u={u}/>)}{d.plan.floors.length<3&&<button onClick={()=>u("plan.floors",[...d.plan.floors,mkFloor(`${d.plan.floors.length+1}F`)])} style={{...S.aB,background:"#F0EDE8"}}>＋ フロア</button>}</FS>;}
+
+function FE({fl,fi,d,u}){
+  const img=useImg(b=>u(`plan.floors.${fi}.image`,b));
+  return<div style={{marginBottom:16,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:"#2C2420",color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u(`plan.floors.${fi}.label`,e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>{d.plan.floors.length>1&&<button onClick={()=>u("plan.floors",d.plan.floors.filter((_,j)=>j!==fi))} style={S.xB}>✕</button>}</div>
+    <ImgS src={fl.image} go={img.go} cl={()=>u(`plan.floors.${fi}.image`,null)}/>{img.el}
+    {fl.rooms.map((r,ri)=><div key={ri} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center"}}><div style={{width:7,height:7,borderRadius:"50%",background:RC[(fi*10+ri)%RC.length]}}/><input value={r.name} onChange={e=>u(`plan.floors.${fi}.rooms.${ri}.name`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="部屋名"/><input value={r.size} onChange={e=>u(`plan.floors.${fi}.rooms.${ri}.size`,e.target.value)} style={{...S.inp,width:52,textAlign:"right",padding:"6px 7px"}} placeholder="帖"/><button onClick={()=>u(`plan.floors.${fi}.rooms`,fl.rooms.filter((_,j)=>j!==ri))} style={S.xB}>✕</button></div>)}
+    <button onClick={()=>u(`plan.floors.${fi}.rooms`,[...fl.rooms,{name:"",size:""}])} style={S.aB}>＋ 部屋</button>
+  </div>;
+}
+
+/* ★ 外観ビュー: 各アイテムを独立コンポーネントに ★ */
+function EExt({d,u}){
+  return<FS t="外観">
+    {d.exterior.views.map((v,i)=><ExtViewItem key={i} v={v} i={i} d={d} u={u}/>)}
+    <button onClick={()=>u("exterior.views",[...d.exterior.views,mkExt("")])} style={S.aB}>＋ 追加</button>
+    <div style={{marginTop:16}}/>
+    <Fi l="説明" v={d.exterior.description} s={v=>u("exterior.description",v)} m rows={3}/>
+  </FS>;
+}
+function ExtViewItem({v,i,d,u}){
+  const img=useImg(b=>u(`exterior.views.${i}.image`,b));
+  return<div style={{marginBottom:10,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}>
+    <div style={{display:"flex",gap:6,marginBottom:8}}><input value={v.label} onChange={e=>u(`exterior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="正面"/><button onClick={()=>u("exterior.views",d.exterior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>
+    <ImgS src={v.image} go={img.go} cl={()=>u(`exterior.views.${i}.image`,null)}/>{img.el}
+  </div>;
+}
+
+/* ★ 内装ビュー: 各アイテムを独立コンポーネントに ★ */
+function EInt({d,u}){
+  return<FS t="内装">
+    {d.interior.views.map((v,i)=><IntViewItem key={i} v={v} i={i} d={d} u={u}/>)}
+    <button onClick={()=>u("interior.views",[...d.interior.views,mkView("","")])} style={S.aB}>＋ 追加</button>
+    <div style={{marginTop:16}}/>
+    <Fi l="説明" v={d.interior.description} s={v=>u("interior.description",v)} m rows={3}/>
+  </FS>;
+}
+function IntViewItem({v,i,d,u}){
+  const img=useImg(b=>u(`interior.views.${i}.image`,b));
+  return<div style={{marginBottom:10,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}>
+    <div style={{display:"flex",gap:6,marginBottom:8}}><input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="ビュー名"/><input value={v.tag||""} onChange={e=>u(`interior.views.${i}.tag`,e.target.value)} style={{...S.inp,width:52,textAlign:"center",fontSize:11}} placeholder="タグ"/><button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>
+    <ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small/>{img.el}
+  </div>;
+}
+
+function ESpe({d,u}){return<FS t="仕様">{d.specs.map((s,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={s.category} onChange={e=>u(`specs.${i}.category`,e.target.value)} style={{...S.inp,width:68}} placeholder="項目"/><input value={s.value} onChange={e=>u(`specs.${i}.value`,e.target.value)} style={{...S.inp,flex:1}} placeholder="内容"/><button onClick={()=>u("specs",d.specs.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("specs",[...d.specs,{category:"",value:""}])} style={S.aB}>＋</button></FS>;}
+
+function EPri({d,u}){return<FS t="資金計画">{d.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>u(`pricing.items.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="項目"/><input value={it.amount} onChange={e=>u(`pricing.items.${i}.amount`,e.target.value)} style={{...S.inp,width:110,textAlign:"right"}} placeholder="金額"/><button onClick={()=>u("pricing.items",d.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("pricing.items",[...d.pricing.items,{label:"",amount:""}])} style={S.aB}>＋</button><Fi l="合計" v={d.pricing.total} s={v=>u("pricing.total",v)} p="3,100万円"/><Fi l="備考" v={d.pricing.notes} s={v=>u("pricing.notes",v)} m rows={2}/></FS>;}
+
+function ECon2({d,u}){return<FS t="連絡先"><Fi l="電話" v={d.contact.phone} s={v=>u("contact.phone",v)}/><Fi l="受付" v={d.contact.hours} s={v=>u("contact.hours",v)}/><Fi l="住所" v={d.contact.address} s={v=>u("contact.address",v)}/></FS>;}
+
 /* ━━━ Views ━━━ */
 function CV({data,onWt,onZoom}){const ref=useRef(null);const[sy,setSy]=useState(0);useEffect(()=>{const el=ref.current;if(!el)return;const h=()=>setSy(el.scrollTop);el.addEventListener("scroll",h,{passive:true});return()=>el.removeEventListener("scroll",h);},[]);return<div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div>;}
 function PV({data,onBack,onWt,onZoom}){const ref=useRef(null);const[sy,setSy]=useState(0);useEffect(()=>{const el=ref.current;if(!el)return;const h=()=>setSy(el.scrollTop);el.addEventListener("scroll",h,{passive:true});return()=>el.removeEventListener("scroll",h);},[]);return<><button onClick={onBack} style={S.bk}>◀ 編集</button><div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div></>;}
 
-/* ━━━ Presentation（レスポンシブ） ━━━ */
+/* ━━━ Presentation ━━━ */
 function Pres({data,sy,onWt,onZoom}){
   const[af,setAf]=useState(0);const[ei,setEi]=useState(0);const[iFlt,setIFlt]=useState("ALL");const[ii,setIi]=useState(0);
   useEffect(()=>{setIi(0);},[iFlt]);const ev=data.exterior.views.filter(v=>v.label);const iv=data.interior.views.filter(v=>v.label);
   const iTags=["ALL",...new Set(iv.map(v=>v.tag).filter(Boolean))];const iF=iFlt==="ALL"?iv:iv.filter(v=>v.tag===iFlt);
   const tR=data.plan.floors.reduce((a,f)=>a+f.rooms.filter(r=>r.name).length,0);
   const zoom=(src,label,list,index)=>{if(src)onZoom({src,label,list:list||null,index:index||0});};
-  const mw={maxWidth:800,margin:"0 auto",width:"100%"};
-
   return<>
-    {/* Cover - full width always */}
-    <div style={{height:"100vh",position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-      <div style={{position:"absolute",inset:0,zIndex:1,background:"linear-gradient(180deg, rgba(30,25,22,0.1) 0%, rgba(30,25,22,0.06) 40%, rgba(30,25,22,0.8) 100%)"}}/>
-      {data.coverImage?<img src={data.coverImage} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",transform:`translateY(${Math.min(sy*0.25,140)}px) scale(1.06)`}}/>:<div style={{position:"absolute",inset:0,background:"linear-gradient(135deg, #8B7355, #A0896D 30%, #6B8F71 60%, #C4B5A0)",transform:`translateY(${Math.min(sy*0.25,140)}px) scale(1.06)`}}/>}
-      <div style={{position:"relative",zIndex:2,padding:"0 5vw 52px",opacity:Math.max(1-sy/400,0),...mw}}>
-        {data.staffName&&<div style={{fontSize:11,letterSpacing:4,color:"rgba(255,255,255,0.5)",marginBottom:10}}>担当：{data.staffName}</div>}
-        <h1 style={{fontSize:"clamp(26px, 4vw, 42px)",fontWeight:300,color:"#fff",lineHeight:1.6,margin:0,letterSpacing:2}}>{data.customerName?`${data.customerName} 様邸`:"○○様邸"}</h1>
-        <div style={{fontSize:"clamp(13px, 2vw, 18px)",fontWeight:300,color:"rgba(255,255,255,0.7)",letterSpacing:3,marginTop:6}}>{data.planTitle}</div>
-        <div style={{width:36,height:1,background:"#C4956A",margin:"20px 0"}}/>
-        <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",letterSpacing:2}}>喜多ハウジング株式会社</div>
-      </div>
-    </div>
-
-    {/* Concept */}
-    <PSec bg="#FAF8F5"><Lb en="CONCEPT" ja="コンセプト"/>
-      <h2 style={{fontSize:"clamp(21px, 3vw, 32px)",fontWeight:300,color:"#2C2420",lineHeight:2,marginBottom:20,whiteSpace:"pre-line"}}>{data.concept.headline}</h2>
-      <p style={S.bd}>{data.concept.body}</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",gap:10,marginTop:28}}>{data.concept.tags.filter(Boolean).map(t=><div key={t} style={S.tg}>{t}</div>)}</div>
-    </PSec>
-
-    {/* Plan */}
-    <PSec bg="#fff"><Lb en="PLAN" ja="間取り"/>
-      <div style={{fontSize:14,color:"#6B6560",fontWeight:300}}>{data.plan.type}</div>
-      <div style={{fontSize:12,color:"#A09890",letterSpacing:1,marginBottom:20}}>延床面積 {data.plan.area}㎡（{data.plan.tsubo}坪）　{tR}室</div>
-      {data.plan.floors.length>1&&<div style={{display:"flex",marginBottom:20,background:"#F5F3F0",borderRadius:8,padding:3,maxWidth:400}}>{data.plan.floors.map((fl,i)=><button key={i} onClick={()=>setAf(i)} style={{flex:1,padding:"10px 0",border:"none",borderRadius:6,fontSize:12,fontWeight:af===i?600:400,background:af===i?"#fff":"transparent",color:af===i?"#2C2420":"#A09890",cursor:"pointer",letterSpacing:2,boxShadow:af===i?"0 1px 6px rgba(0,0,0,0.08)":"none"}}>{fl.label}</button>)}</div>}
-      {data.plan.floors[af]?.image?<img src={data.plan.floors[af].image} alt="" onClick={()=>zoom(data.plan.floors[af].image,data.plan.floors[af].label)} style={{width:"100%",maxWidth:600,borderRadius:12,marginBottom:20,cursor:"pointer"}}/>:<div style={{background:"#F5F3F0",borderRadius:12,aspectRatio:"4/3",maxWidth:600,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}><div style={{opacity:0.35,fontSize:22,fontWeight:300,color:"#8B7355"}}>{data.plan.floors[af]?.label}</div></div>}
-      <div style={{maxWidth:500}}>{data.plan.floors[af]?.rooms.filter(r=>r.name).map((r,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #F0EDE8"}}><div style={{width:7,height:7,borderRadius:"50%",background:RC[(af*10+i)%RC.length]}}/><span style={{fontSize:13,color:"#2C2420",flex:1}}>{r.name}</span><span style={{fontSize:13,color:"#8B7355",fontWeight:500}}>{r.size}帖</span></div>)}</div>
-    </PSec>
-
-    {/* Exterior */}
+    <div style={{height:"100vh",position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}><div style={{position:"absolute",inset:0,zIndex:1,background:"linear-gradient(180deg, rgba(30,25,22,0.1) 0%, rgba(30,25,22,0.06) 40%, rgba(30,25,22,0.8) 100%)"}}/>{data.coverImage?<img src={data.coverImage} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",transform:`translateY(${Math.min(sy*0.25,140)}px) scale(1.06)`}}/>:<div style={{position:"absolute",inset:0,background:"linear-gradient(135deg, #8B7355, #A0896D 30%, #6B8F71 60%, #C4B5A0)",transform:`translateY(${Math.min(sy*0.25,140)}px) scale(1.06)`}}/>}<div style={{position:"relative",zIndex:2,padding:"0 5vw 52px",maxWidth:800,margin:"0 auto",width:"100%"}}>{data.staffName&&<div style={{fontSize:11,letterSpacing:4,color:"rgba(255,255,255,0.5)",marginBottom:10}}>担当：{data.staffName}</div>}<h1 style={{fontSize:"clamp(26px, 4vw, 42px)",fontWeight:300,color:"#fff",lineHeight:1.6,margin:0,letterSpacing:2}}>{data.customerName?`${data.customerName} 様邸`:"○○様邸"}</h1><div style={{fontSize:"clamp(13px, 2vw, 18px)",fontWeight:300,color:"rgba(255,255,255,0.7)",letterSpacing:3,marginTop:6}}>{data.planTitle}</div><div style={{width:36,height:1,background:"#C4956A",margin:"20px 0"}}/><div style={{fontSize:12,color:"rgba(255,255,255,0.4)",letterSpacing:2}}>喜多ハウジング株式会社</div></div></div>
+    <PSec bg="#FAF8F5"><Lb en="CONCEPT" ja="コンセプト"/><h2 style={{fontSize:"clamp(21px, 3vw, 32px)",fontWeight:300,color:"#2C2420",lineHeight:2,marginBottom:20,whiteSpace:"pre-line"}}>{data.concept.headline}</h2><p style={S.bd}>{data.concept.body}</p><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",gap:10,marginTop:28}}>{data.concept.tags.filter(Boolean).map(t=><div key={t} style={S.tg}>{t}</div>)}</div></PSec>
+    <PSec bg="#fff"><Lb en="PLAN" ja="間取り"/><div style={{fontSize:14,color:"#6B6560"}}>{data.plan.type}</div><div style={{fontSize:12,color:"#A09890",marginBottom:20}}>延床面積 {data.plan.area}㎡（{data.plan.tsubo}坪）　{tR}室</div>{data.plan.floors.length>1&&<div style={{display:"flex",marginBottom:20,background:"#F5F3F0",borderRadius:8,padding:3,maxWidth:400}}>{data.plan.floors.map((fl,i)=><button key={i} onClick={()=>setAf(i)} style={{flex:1,padding:"10px 0",border:"none",borderRadius:6,fontSize:12,fontWeight:af===i?600:400,background:af===i?"#fff":"transparent",color:af===i?"#2C2420":"#A09890",cursor:"pointer",letterSpacing:2,boxShadow:af===i?"0 1px 6px rgba(0,0,0,0.08)":"none"}}>{fl.label}</button>)}</div>}{data.plan.floors[af]?.image?<img src={data.plan.floors[af].image} alt="" onClick={()=>zoom(data.plan.floors[af].image,data.plan.floors[af].label)} style={{width:"100%",maxWidth:600,borderRadius:12,marginBottom:20,cursor:"pointer"}}/>:<div style={{background:"#F5F3F0",borderRadius:12,aspectRatio:"4/3",maxWidth:600,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}><div style={{opacity:0.35,fontSize:22,fontWeight:300,color:"#8B7355"}}>{data.plan.floors[af]?.label}</div></div>}<div style={{maxWidth:500}}>{data.plan.floors[af]?.rooms.filter(r=>r.name).map((r,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #F0EDE8"}}><div style={{width:7,height:7,borderRadius:"50%",background:RC[(af*10+i)%RC.length]}}/><span style={{fontSize:13,color:"#2C2420",flex:1}}>{r.name}</span><span style={{fontSize:13,color:"#8B7355",fontWeight:500}}>{r.size}帖</span></div>)}</div></PSec>
     <div style={{background:"#FAF8F5",padding:"72px 0"}}><div style={{padding:"0 5vw",maxWidth:800,margin:"0 auto"}}><Lb en="EXTERIOR" ja="外観デザイン"/></div>{ev.length>0&&<GH items={ev} idx={ei} setIdx={setEi} onZoom={zoom} light/>}<div style={{padding:"16px 5vw 0",maxWidth:800,margin:"0 auto"}}><p style={S.bd}>{data.exterior.description}</p></div></div>
-
-    {/* Interior */}
-    <div style={{background:"#1A1614",padding:"0 0 48px"}}>
-      <div style={{padding:"72px 5vw 0",maxWidth:800,margin:"0 auto"}}><Lb en="INTERIOR" ja="内装デザイン" dark/></div>
-      {iv.length>0&&<>{iTags.length>2&&<div style={{display:"flex",gap:6,padding:"0 5vw 16px",maxWidth:800,margin:"0 auto",overflowX:"auto"}}>{iTags.map(t=><button key={t} onClick={()=>setIFlt(t)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,border:"1px solid",borderColor:iFlt===t?"#C4956A":"rgba(255,255,255,0.12)",background:iFlt===t?"rgba(196,149,106,0.15)":"transparent",color:iFlt===t?"#C4956A":"rgba(255,255,255,0.45)",fontSize:11,cursor:"pointer",letterSpacing:1}}>{t==="ALL"?"すべて":t}</button>)}</div>}<GH items={iF} idx={ii} setIdx={setIi} onZoom={zoom} dark showTag/></>}
-      <div style={{padding:"20px 5vw 0",maxWidth:800,margin:"0 auto"}}><p style={{fontSize:13,lineHeight:2.2,color:"rgba(255,255,255,0.45)",fontWeight:300}}>{data.interior.description}</p></div>
-    </div>
-
-    {/* 3D */}
+    <div style={{background:"#1A1614",padding:"0 0 48px"}}><div style={{padding:"72px 5vw 0",maxWidth:800,margin:"0 auto"}}><Lb en="INTERIOR" ja="内装デザイン" dark/></div>{iv.length>0&&<>{iTags.length>2&&<div style={{display:"flex",gap:6,padding:"0 5vw 16px",maxWidth:800,margin:"0 auto",overflowX:"auto"}}>{iTags.map(t=><button key={t} onClick={()=>setIFlt(t)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,border:"1px solid",borderColor:iFlt===t?"#C4956A":"rgba(255,255,255,0.12)",background:iFlt===t?"rgba(196,149,106,0.15)":"transparent",color:iFlt===t?"#C4956A":"rgba(255,255,255,0.45)",fontSize:11,cursor:"pointer",letterSpacing:1}}>{t==="ALL"?"すべて":t}</button>)}</div>}<GH items={iF} idx={ii} setIdx={setIi} onZoom={zoom} dark showTag/></>}<div style={{padding:"20px 5vw 0",maxWidth:800,margin:"0 auto"}}><p style={{fontSize:13,lineHeight:2.2,color:"rgba(255,255,255,0.45)",fontWeight:300}}>{data.interior.description}</p></div></div>
     {data.viewer3dUrl&&<div style={{background:"#111",padding:"48px 5vw"}}><div style={{maxWidth:800,margin:"0 auto"}}><Lb en="3D WALKTHROUGH" ja="3Dウォークスルー" dark center/><button onClick={onWt} style={{width:"100%",maxWidth:400,margin:"0 auto",padding:"22px 0",border:"1px solid rgba(196,149,106,0.3)",borderRadius:14,background:"rgba(196,149,106,0.06)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><div style={{width:56,height:56,borderRadius:"50%",border:"2px solid rgba(196,149,106,0.35)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="#C4956A"><polygon points="5,3 19,12 5,21"/></svg></div><div style={{fontSize:13,color:"#C4956A",letterSpacing:2,fontWeight:500}}>全画面で3Dビューを開く</div></button></div></div>}
-
-    {/* Spec */}
     <PSec bg="#fff"><Lb en="SPEC" ja="主要仕様"/><div style={{maxWidth:500}}>{data.specs.filter(s=>s.category).map((s,i)=><div key={i} style={{display:"flex",padding:"13px 0",borderBottom:i<data.specs.length-1?"1px solid #F0EDE8":"none",gap:14}}><span style={{fontSize:11,color:"#A09890",fontWeight:500,letterSpacing:2,minWidth:48}}>{s.category}</span><span style={{fontSize:13,color:"#2C2420",lineHeight:1.8}}>{s.value}</span></div>)}</div></PSec>
-
-    {/* Price */}
-    <PSec bg="#FAF8F5"><Lb en="PRICE" ja="資金計画"/>
-      <div style={{maxWidth:500}}>{data.pricing.items.filter(p=>p.label).map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"14px 0",borderBottom:i<data.pricing.items.length-1?"1px solid #EBE8E3":"none"}}><span style={{fontSize:13,color:"#6B6560"}}>{it.label}</span><span style={{fontSize:14,color:"#2C2420",fontWeight:500}}>{it.amount||"—"}</span></div>)}{data.pricing.total&&<div style={{marginTop:14,padding:"16px 0",borderTop:"2px solid #2C2420",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:13,color:"#2C2420",fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:22,color:"#2C2420",fontWeight:300}}>{data.pricing.total}</span></div>}{data.pricing.notes&&<div style={{marginTop:14,padding:14,background:"#EDEAE6",borderRadius:8,fontSize:11,color:"#A09890",lineHeight:2}}>※ {data.pricing.notes}</div>}</div>
-    </PSec>
-
-    {/* Contact */}
-    <PSec bg="#2C2420" last><Lb en="CONTACT" ja="お問合せ" dark center/><div style={{textAlign:"center"}}>
-      <a href={`tel:${data.contact.phone.replace(/-/g,"")}`} style={{fontSize:"clamp(20px, 3vw, 28px)",color:"#fff",fontWeight:300,letterSpacing:3,display:"block",marginBottom:6}}>{data.contact.phone}</a>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.3)",letterSpacing:1,marginBottom:32}}>{data.contact.hours}</div>
-      <div style={{width:36,height:1,background:"rgba(196,149,106,0.2)",margin:"0 auto 32px"}}/>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.25)",letterSpacing:2,lineHeight:2.4}}>喜多ハウジング株式会社<br/>{data.contact.address}</div>
-      {data.staffName&&<div style={{marginTop:20,fontSize:12,color:"rgba(255,255,255,0.4)"}}>担当：{data.staffName}</div>}
-      <div style={{marginTop:44,fontSize:9,color:"rgba(255,255,255,0.12)",letterSpacing:2}}>© 2026 KITA HOUSING</div>
-    </div></PSec>
+    <PSec bg="#FAF8F5"><Lb en="PRICE" ja="資金計画"/><div style={{maxWidth:500}}>{data.pricing.items.filter(p=>p.label).map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"14px 0",borderBottom:i<data.pricing.items.length-1?"1px solid #EBE8E3":"none"}}><span style={{fontSize:13,color:"#6B6560"}}>{it.label}</span><span style={{fontSize:14,color:"#2C2420",fontWeight:500}}>{it.amount||"—"}</span></div>)}{data.pricing.total&&<div style={{marginTop:14,padding:"16px 0",borderTop:"2px solid #2C2420",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:13,color:"#2C2420",fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:22,color:"#2C2420",fontWeight:300}}>{data.pricing.total}</span></div>}{data.pricing.notes&&<div style={{marginTop:14,padding:14,background:"#EDEAE6",borderRadius:8,fontSize:11,color:"#A09890",lineHeight:2}}>※ {data.pricing.notes}</div>}</div></PSec>
+    <PSec bg="#2C2420" last><Lb en="CONTACT" ja="お問合せ" dark center/><div style={{textAlign:"center"}}><a href={`tel:${data.contact.phone.replace(/-/g,"")}`} style={{fontSize:"clamp(20px, 3vw, 28px)",color:"#fff",fontWeight:300,letterSpacing:3,display:"block",marginBottom:6}}>{data.contact.phone}</a><div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginBottom:32}}>{data.contact.hours}</div><div style={{width:36,height:1,background:"rgba(196,149,106,0.2)",margin:"0 auto 32px"}}/><div style={{fontSize:12,color:"rgba(255,255,255,0.25)",letterSpacing:2,lineHeight:2.4}}>喜多ハウジング株式会社<br/>{data.contact.address}</div>{data.staffName&&<div style={{marginTop:20,fontSize:12,color:"rgba(255,255,255,0.4)"}}>担当：{data.staffName}</div>}<div style={{marginTop:44,fontSize:9,color:"rgba(255,255,255,0.12)",letterSpacing:2}}>© 2026 KITA HOUSING</div></div></PSec>
   </>;
 }
 
@@ -275,7 +232,7 @@ function GH({items,idx,setIdx,onZoom,dark,light,showTag}){
   </div>}
   {items.length>1&&(items.length<=8
     ?<div style={{display:"flex",gap:6,padding:"12px 20px",overflowX:"auto",justifyContent:"center"}}>{items.map((v,i)=><button key={i} onClick={()=>setIdx(i)} style={{flexShrink:0,width:80,height:58,borderRadius:8,overflow:"hidden",border:"none",padding:0,cursor:"pointer",outline:si===i?"2px solid #C4956A":"2px solid transparent",outlineOffset:-2,opacity:si===i?1:0.45,background:"none"}}>{v.image?<img src={v.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${GR[i%GR.length]})`,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:9,color:"rgba(255,255,255,0.7)"}}>{v.label}</span></div>}</button>)}</div>
-    :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(80px, 1fr))",gap:3,padding:"3px 3px 0",maxWidth:800,margin:"0 auto"}}>{items.map((v,i)=><button key={i} onClick={()=>setIdx(i)} style={{aspectRatio:"4/3",borderRadius:4,overflow:"hidden",border:"none",padding:0,cursor:"pointer",position:"relative",opacity:si===i?1:0.5,background:"none",outline:si===i?"2px solid #C4956A":"2px solid transparent",outlineOffset:-2}}>{v.image?<img src={v.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${GR[i%GR.length]})`}}/>}<div style={{position:"absolute",bottom:0,left:0,right:0,padding:"10px 4px 2px",background:"linear-gradient(transparent, rgba(0,0,0,0.65))"}}><div style={{fontSize:7,color:"rgba(255,255,255,0.85)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.label}</div></div></button>)}</div>
+    :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(80px, 1fr))",gap:3,padding:"3px",maxWidth:800,margin:"0 auto"}}>{items.map((v,i)=><button key={i} onClick={()=>setIdx(i)} style={{aspectRatio:"4/3",borderRadius:4,overflow:"hidden",border:"none",padding:0,cursor:"pointer",position:"relative",opacity:si===i?1:0.5,background:"none",outline:si===i?"2px solid #C4956A":"2px solid transparent",outlineOffset:-2}}>{v.image?<img src={v.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${GR[i%GR.length]})`}}/>}<div style={{position:"absolute",bottom:0,left:0,right:0,padding:"10px 4px 2px",background:"linear-gradient(transparent, rgba(0,0,0,0.65))"}}><div style={{fontSize:7,color:"rgba(255,255,255,0.85)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.label}</div></div></button>)}</div>
   )}</>;
 }
 
@@ -306,28 +263,7 @@ function WT({url,onClose}){
   </div>;
 }
 
-/* ━━━ Editor Tabs ━━━ */
-function EBas({d,u}){const img=useImg(b=>u("coverImage",b));return<FS t="基本情報"><Fi l="お客様名" v={d.customerName} s={v=>u("customerName",v)} p="例：山田 太郎"/><Fi l="担当者名" v={d.staffName} s={v=>u("staffName",v)}/><Fi l="プランタイトル" v={d.planTitle} s={v=>u("planTitle",v)}/><div style={{marginTop:8}}/><div style={S.fl}>カバー画像</div><ImgS src={d.coverImage} go={img.go} cl={()=>u("coverImage",null)} tall/>{img.el}</FS>;}
-function ECon({d,u}){return<FS t="コンセプト"><Fi l="キャッチコピー" v={d.concept.headline} s={v=>u("concept.headline",v)} m/><Fi l="説明文" v={d.concept.body} s={v=>u("concept.body",v)} m rows={4}/><div style={S.fl}>キーワード</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{d.concept.tags.map((t,i)=><input key={i} value={t} onChange={e=>{const a=[...d.concept.tags];a[i]=e.target.value;u("concept.tags",a);}} style={S.inp}/>)}</div></FS>;}
-function EPla({d,u}){return<FS t="間取り"><Fi l="タイプ" v={d.plan.type} s={v=>u("plan.type",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Fi l="㎡" v={d.plan.area} s={v=>u("plan.area",v)}/><Fi l="坪" v={d.plan.tsubo} s={v=>u("plan.tsubo",v)}/></div>{d.plan.floors.map((fl,fi)=><FE key={fi} fl={fl} fi={fi} d={d} u={u}/>)}{d.plan.floors.length<3&&<button onClick={()=>u("plan.floors",[...d.plan.floors,mkFloor(`${d.plan.floors.length+1}F`)])} style={{...S.aB,background:"#F0EDE8"}}>＋ フロア</button>}</FS>;}
-function FE({fl,fi,d,u}){const img=useImg(b=>u(`plan.floors.${fi}.image`,b));return<div style={{marginBottom:16,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:"#2C2420",color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u(`plan.floors.${fi}.label`,e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>{d.plan.floors.length>1&&<button onClick={()=>u("plan.floors",d.plan.floors.filter((_,j)=>j!==fi))} style={S.xB}>✕</button>}</div><ImgS src={fl.image} go={img.go} cl={()=>u(`plan.floors.${fi}.image`,null)}/>{img.el}{fl.rooms.map((r,ri)=><div key={ri} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center"}}><div style={{width:7,height:7,borderRadius:"50%",background:RC[(fi*10+ri)%RC.length]}}/><input value={r.name} onChange={e=>u(`plan.floors.${fi}.rooms.${ri}.name`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="部屋名"/><input value={r.size} onChange={e=>u(`plan.floors.${fi}.rooms.${ri}.size`,e.target.value)} style={{...S.inp,width:52,textAlign:"right",padding:"6px 7px"}} placeholder="帖"/><button onClick={()=>u(`plan.floors.${fi}.rooms`,fl.rooms.filter((_,j)=>j!==ri))} style={S.xB}>✕</button></div>)}<button onClick={()=>u(`plan.floors.${fi}.rooms`,[...fl.rooms,{name:"",size:""}])} style={S.aB}>＋ 部屋</button></div>;}
-function EExt({d,u}){return<FS t="外観">{d.exterior.views.map((v,i)=>{const img=useImg(b=>u(`exterior.views.${i}.image`,b));return<div key={i} style={{marginBottom:10,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",gap:6,marginBottom:8}}><input value={v.label} onChange={e=>u(`exterior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="正面"/><button onClick={()=>u("exterior.views",d.exterior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`exterior.views.${i}.image`,null)}/>{img.el}</div>;})}<button onClick={()=>u("exterior.views",[...d.exterior.views,mkExt("")])} style={S.aB}>＋ 追加</button><Fi l="説明" v={d.exterior.description} s={v=>u("exterior.description",v)} m rows={3}/></FS>;}
-function EInt({d,u}){return<FS t="内装">{d.interior.views.map((v,i)=>{const img=useImg(b=>u(`interior.views.${i}.image`,b));return<div key={i} style={{marginBottom:10,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",gap:6,marginBottom:8}}><input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="ビュー名"/><input value={v.tag||""} onChange={e=>u(`interior.views.${i}.tag`,e.target.value)} style={{...S.inp,width:52,textAlign:"center",fontSize:11}} placeholder="タグ"/><button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small/>{img.el}</div>;})}<button onClick={()=>u("interior.views",[...d.interior.views,mkView("","")])} style={S.aB}>＋ 追加</button><Fi l="説明" v={d.interior.description} s={v=>u("interior.description",v)} m rows={3}/></FS>;}
-function ESpe({d,u}){return<FS t="仕様">{d.specs.map((s,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={s.category} onChange={e=>u(`specs.${i}.category`,e.target.value)} style={{...S.inp,width:68}} placeholder="項目"/><input value={s.value} onChange={e=>u(`specs.${i}.value`,e.target.value)} style={{...S.inp,flex:1}} placeholder="内容"/><button onClick={()=>u("specs",d.specs.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("specs",[...d.specs,{category:"",value:""}])} style={S.aB}>＋</button></FS>;}
-function EPri({d,u}){return<FS t="資金計画">{d.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>u(`pricing.items.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="項目"/><input value={it.amount} onChange={e=>u(`pricing.items.${i}.amount`,e.target.value)} style={{...S.inp,width:110,textAlign:"right"}} placeholder="金額"/><button onClick={()=>u("pricing.items",d.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("pricing.items",[...d.pricing.items,{label:"",amount:""}])} style={S.aB}>＋</button><Fi l="合計" v={d.pricing.total} s={v=>u("pricing.total",v)} p="3,100万円"/><Fi l="備考" v={d.pricing.notes} s={v=>u("pricing.notes",v)} m rows={2}/></FS>;}
-function ECon2({d,u}){return<FS t="連絡先"><Fi l="電話" v={d.contact.phone} s={v=>u("contact.phone",v)}/><Fi l="受付" v={d.contact.hours} s={v=>u("contact.hours",v)}/><Fi l="住所" v={d.contact.address} s={v=>u("contact.address",v)}/></FS>;}
-
-/* ━━━ Shared ━━━ */
-function Sh({children,full}){return<div style={{...S.shell,maxWidth:full?"none":"640px"}}>{children}</div>;}
-function PSec({children,bg,last}){return<div style={{padding:last?"72px 5vw 80px":"72px 5vw",background:bg}}><div style={{maxWidth:800,margin:"0 auto"}}>{children}</div></div>;}
-function useImg(cb){const r=useRef(null);const el=<input ref={r} type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>cb(ev.target.result);rd.readAsDataURL(f);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el};}
-function up(sd,p,v){sd(prev=>{const n=JSON.parse(JSON.stringify(prev));const k=p.split(".");let o=n;for(let i=0;i<k.length-1;i++)o=/^\d+$/.test(k[i])?o[+k[i]]:o[k[i]];const l=k[k.length-1];o[/^\d+$/.test(l)?+l:l]=v;return n;});}
-function Sec({children,bg,last}){return<div style={{padding:last?"72px 28px 80px":"72px 28px",background:bg}}>{children}</div>;}
-function Lb({en,ja,dark,center}){return<div style={{marginBottom:24,textAlign:center?"center":"left"}}><div style={{fontSize:10,letterSpacing:5,color:dark?"rgba(196,149,106,0.45)":"#A09890",fontWeight:500}}>{en}</div><div style={{fontSize:14,letterSpacing:3,color:dark?"rgba(255,255,255,0.8)":"#2C2420",fontWeight:300,marginTop:5}}>{ja}</div><div style={{width:22,height:1,background:"#C4956A",marginTop:14,marginLeft:center?"auto":0,marginRight:center?"auto":0}}/></div>;}
-function FS({t,children}){return<div><div style={{fontSize:14,fontWeight:600,color:"#2C2420",letterSpacing:1,marginBottom:20}}>{t}</div>{children}</div>;}
-function Fi({l,v,s,p,m,rows=2,type}){return<div style={{marginBottom:14}}><div style={S.fl}>{l}</div>{m?<textarea value={v} onChange={e=>s(e.target.value)} placeholder={p} rows={rows} style={{...S.inp,resize:"vertical",minHeight:rows*24}}/>:<input type={type||"text"} value={v} onChange={e=>s(e.target.value)} placeholder={p} style={S.inp}/>}</div>;}
-function ImgS({src,go,cl,tall,small}){if(src)return<div style={{position:"relative",marginBottom:6}}><img src={src} alt="" style={{width:"100%",borderRadius:8,display:"block",maxHeight:tall?200:small?90:140,objectFit:"cover"}}/><button onClick={cl} style={{position:"absolute",top:5,right:5,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>;return<button onClick={go} style={{width:"100%",height:tall?120:small?56:88,border:"1.5px dashed #D5D0CA",borderRadius:8,background:"#FAFAF8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5AFA8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span style={{fontSize:10,color:"#A09890"}}>画像を選択</span></button>;}
-
+/* ━━━ Styles ━━━ */
 const S={
   shell:{width:"100%",maxWidth:640,margin:"0 auto",height:"100%",background:"#FAF8F5",position:"relative",overflow:"hidden",display:"flex",flexDirection:"column"},
   eH:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid #EDEAE6",background:"#fff",flexShrink:0},
