@@ -227,8 +227,13 @@ function FE({fl,fi,d,u}){const img=useImg(b=>u(`plan.floors.${fi}.image`,b));ret
 /* ★ 外観（一括アップロード対応） ★ */
 function EExt({d,u}){
   const bulk=useBulkImg((results)=>{
-    const newViews=[...d.exterior.views,...results.map(r=>({label:r.label,image:r.image}))];
-    u("exterior.views",newViews);
+    const views=[...d.exterior.views];
+    for(const r of results){
+      const idx=views.findIndex(v=>v.label===r.label);
+      if(idx>=0){views[idx]={...views[idx],image:r.image};}
+      else{views.push({label:r.label,image:r.image});}
+    }
+    u("exterior.views",views);
   });
   const move=(from,to)=>{const v=[...d.exterior.views];const[item]=v.splice(from,1);v.splice(to,0,item);u("exterior.views",v);};
   return<FS t="外観パース">
@@ -258,8 +263,13 @@ function ExtViewItem({v,i,d,u,total,onMove}){
 /* ★ 内装（一括アップロード＋タグドロップダウン対応） ★ */
 function EInt({d,u}){
   const bulk=useBulkImg((results)=>{
-    const newViews=[...d.interior.views,...results.map(r=>({label:r.label,image:r.image,tag:""}))];
-    u("interior.views",newViews);
+    const views=[...d.interior.views];
+    for(const r of results){
+      const idx=views.findIndex(v=>v.label===r.label);
+      if(idx>=0){views[idx]={...views[idx],image:r.image};}
+      else{views.push({label:r.label,image:r.image,tag:""});}
+    }
+    u("interior.views",views);
   });
   const move=(from,to)=>{const v=[...d.interior.views];const[item]=v.splice(from,1);v.splice(to,0,item);u("interior.views",v);};
   return<FS t="内装 3Dビュー">
