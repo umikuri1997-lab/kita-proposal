@@ -135,7 +135,7 @@ function QRCode({url,size=160}){
 
 /* ━━━ App ━━━ */
 function App(){
-  const[mode,setMode]=useState("loading");const[data,setData]=useState(DEFAULT);const[tab,setTab]=useState("basic");const[lb,setLb]=useState(null);const[shareId,setShareId]=useState(null);const[err,setErr]=useState(null);
+  const[mode,setMode]=useState("loading");const[data,setData]=useState(DEFAULT);const[tab,setTab]=useState("basic");const[lb,setLb]=useState(null);const[shareId,setShareId]=useState(null);const[err,setErr]=useState(null);const prevRef=useRef("edit");
   useEffect(()=>{
     const hash=location.hash.replace("#","");const params=new URLSearchParams(location.search);
     if(hash&&hash.length>=4&&params.get("v")==="1"){loadP(hash).then(row=>{if(row?.data){setData(row.data);setMode("customer");}else setMode("login");}).catch(()=>setMode("login"));return;}
@@ -146,10 +146,10 @@ function App(){
   const handleLoad=async(id)=>{try{const row=await loadP(id);if(row?.data){setData(row.data);setShareId(id);setMode("edit");}}catch(e){setErr(e.message);}};
   if(mode==="loading")return<Sh full><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{color:"#A09890",fontSize:13,letterSpacing:2}}>読み込み中...</p></div></Sh>;
   if(mode==="login")return<Login onDone={handleLogin}/>;
-  if(mode==="walkthrough")return<WT url={data.viewer3dUrl} onClose={()=>setMode("preview")}/>;
+  if(mode==="walkthrough")return<WT url={data.viewer3dUrl} onClose={()=>setMode(prevRef.current)}/>;
   return<>
-    {mode==="customer"&&<Sh full><CV data={data} onWt={()=>setMode("walkthrough")} onZoom={setLb}/></Sh>}
-    {mode==="preview"&&<Sh full><PV data={data} onBack={()=>setMode("edit")} onWt={()=>setMode("walkthrough")} onZoom={setLb}/></Sh>}
+    {mode==="customer"&&<Sh full><CV data={data} onWt={()=>{prevRef.current="customer";setMode("walkthrough");}} onZoom={setLb}/></Sh>}
+    {mode==="preview"&&<Sh full><PV data={data} onBack={()=>setMode("edit")} onWt={()=>{prevRef.current="preview";setMode("walkthrough");}} onZoom={setLb}/></Sh>}
     {mode==="edit"&&<Sh><Ed data={data} setData={setData} tab={tab} setTab={setTab} onPv={()=>setMode("preview")} sid={shareId} onSave={handleSave} onLoad={handleLoad} onNew={()=>{setData(DEFAULT);setShareId(null);setTab("basic");}} onList={()=>setMode("list")} err={err} setErr={setErr} onLogout={()=>{setKey("");setMode("login");}}/></Sh>}
     {mode==="list"&&<Sh><LS onLoad={handleLoad} onBack={()=>setMode("edit")}/></Sh>}
     {lb&&mode!=="walkthrough"&&<LightBox {...lb} onClose={()=>setLb(null)} onChange={setLb}/>}
