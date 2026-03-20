@@ -42,108 +42,95 @@ const loadP=(id)=>api(`/api/proposals/${id}`);
 const listP=()=>api("/api/proposals",{auth:true});
 const delP=(id)=>api(`/api/proposals/${id}`,{method:"DELETE",auth:true});
 
+/* ━━━ R2 画像アップロード ━━━ */
+async function uploadImage(base64){
+  const res=await api("/api/images",{method:"POST",body:{data:base64},auth:true});
+  return res.url; // R2のURL
+}
+
 /* ━━━ Data ━━━ */
 const mkFloor=(l)=>({label:l,image:null});
 const mkView=(l,t)=>({label:l,image:null,tag:t||""});
 const mkExt=(l)=>({label:l,image:null});
 const DEFAULT={customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{type:"4LDK ＋ WIC ＋ SIC",area:"112.62",tsubo:"34.06",floors:[{label:"1F",image:null},{label:"2F",image:null}]},exterior:{description:"シンプルモダンの外観に、木目調アクセントで温かみをプラス。",views:[]},interior:{description:"無垢材のフローリングとホワイトの壁を基調に、上質で落ち着いた空間を演出。",views:[]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
-const RC=["#C4956A","#7A9B6D","#6D7F9B","#9B6D8A","#9B8A6D","#6D9B93","#8A6D9B","#9B7A6D","#6D8A7A","#9B6D6D","#7A6D9B","#6D9B8A","#9B916D","#6D819B","#9B6D7A","#7A9B86","#916D9B","#9B866D","#6D9B7A","#8A9B6D"];
 const GR=["#A0896D,#C4B5A0","#6B8F71,#8BA893","#7E8B9A,#9AABB8","#9A8B7E,#B8A99A","#8B7A9B,#A899B8"];
 const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(let i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
 
-/* ━━━ ファイル名 → ビュー名 変換 ━━━ */
-function fileToLabel(filename){
-  let name=filename.replace(/\.[^.]+$/,""); // 拡張子除去
-  // プレフィックス除去パターン
-  const prefixes=["パース図-","パース図_","パース-","パース_","パース図 "];
-  for(const p of prefixes){if(name.startsWith(p)){name=name.slice(p.length);break;}}
-  return name.trim()||"無題";
-}
+/* ━━━ ファイル名→ビュー名 ━━━ */
+function fileToLabel(fn){let n=fn.replace(/\.[^.]+$/,"");const px=["パース図-","パース図_","パース-","パース_","パース図 "];for(const p of px){if(n.startsWith(p)){n=n.slice(p.length);break;}}return n.trim()||"無題";}
 
-/* ━━━ 画像圧縮（長辺1600px、JPEG 75%に自動変換） ━━━ */
-const MAX_IMG_SIZE=1600;
-const IMG_QUALITY=0.75;
+/* ━━━ 画像圧縮 ━━━ */
+const MAX_IMG=1600,IMG_Q=0.75;
 function compressImage(file){
-  return new Promise((resolve)=>{
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    img.onload=()=>{
-      URL.revokeObjectURL(url);
-      let w=img.width,h=img.height;
-      if(w>MAX_IMG_SIZE||h>MAX_IMG_SIZE){
-        if(w>h){h=Math.round(h*(MAX_IMG_SIZE/w));w=MAX_IMG_SIZE;}
-        else{w=Math.round(w*(MAX_IMG_SIZE/h));h=MAX_IMG_SIZE;}
-      }
-      const c=document.createElement("canvas");
-      c.width=w;c.height=h;
-      const ctx=c.getContext("2d");
-      ctx.drawImage(img,0,0,w,h);
-      resolve(c.toDataURL("image/jpeg",IMG_QUALITY));
-    };
-    img.onerror=()=>{
-      URL.revokeObjectURL(url);
-      // fallback: read as-is
-      const r=new FileReader();r.onload=ev=>resolve(ev.target.result);r.readAsDataURL(file);
-    };
+  return new Promise(resolve=>{
+    const img=new Image();const url=URL.createObjectURL(file);
+    img.onload=()=>{URL.revokeObjectURL(url);let w=img.width,h=img.height;
+      if(w>MAX_IMG||h>MAX_IMG){if(w>h){h=Math.round(h*(MAX_IMG/w));w=MAX_IMG;}else{w=Math.round(w*(MAX_IMG/h));h=MAX_IMG;}}
+      const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);
+      resolve(c.toDataURL("image/jpeg",IMG_Q));};
+    img.onerror=()=>{URL.revokeObjectURL(url);const r=new FileReader();r.onload=ev=>resolve(ev.target.result);r.readAsDataURL(file);};
     img.src=url;
   });
 }
 
-/* ━━━ 一括画像読み込み ━━━ */
+/* ━━━ 圧縮→R2アップロード ━━━ */
+async function compressAndUpload(file){
+  const b64=await compressImage(file);
+  const url=await uploadImage(b64);
+  return url;
+}
+
+/* ━━━ 一括画像読み込み→R2 ━━━ */
 function useBulkImg(onResults){
-  const ref=useRef(null);
+  const ref=useRef(null);const[uploading,setUploading]=useState(false);
   const go=()=>ref.current?.click();
   const handle=async(e)=>{
-    const files=Array.from(e.target.files||[]);
-    if(!files.length)return;
+    const files=Array.from(e.target.files||[]);if(!files.length)return;
+    setUploading(true);
     const results=[];
     for(const f of files){
-      const b64=await compressImage(f);
-      results.push({label:fileToLabel(f.name),image:b64});
+      try{const url=await compressAndUpload(f);results.push({label:fileToLabel(f.name),image:url});}
+      catch(err){console.error("Upload failed:",f.name,err);}
     }
-    onResults(results);
-    e.target.value="";
+    onResults(results);setUploading(false);e.target.value="";
   };
   const el=<input ref={ref} type="file" accept="image/*" multiple onChange={handle} style={{display:"none"}}/>;
-  return{go,el};
+  return{go,el,uploading};
+}
+
+/* ━━━ 単体画像→R2 ━━━ */
+function useImg(cb){
+  const ref=useRef(null);const[uploading,setUploading]=useState(false);
+  const el=<input ref={ref} type="file" accept="image/*" onChange={async e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    setUploading(true);try{const url=await compressAndUpload(f);cb(url);}catch(err){console.error(err);}
+    setUploading(false);e.target.value="";
+  }} style={{display:"none"}}/>;
+  return{go:()=>ref.current?.click(),el,uploading};
 }
 
 /* ━━━ Shared Helpers ━━━ */
-function useImg(cb){const r=useRef(null);const el=<input ref={r} type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;const b64=await compressImage(f);cb(b64);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el};}
 function up(sd,p,v){sd(prev=>{const n=JSON.parse(JSON.stringify(prev));const k=p.split(".");let o=n;for(let i=0;i<k.length-1;i++)o=/^\d+$/.test(k[i])?o[+k[i]]:o[k[i]];const l=k[k.length-1];o[/^\d+$/.test(l)?+l:l]=v;return n;});}
 function Sh({children,full}){return<div style={{...S.shell,maxWidth:full?"none":"640px"}}>{children}</div>;}
 function PSec({children,bg,last}){return<div style={{padding:last?"72px 5vw 80px":"72px 5vw",background:bg}}><div style={{maxWidth:800,margin:"0 auto"}}>{children}</div></div>;}
 function Lb({en,ja,dark,center}){return<div style={{marginBottom:24,textAlign:center?"center":"left"}}><div style={{fontSize:10,letterSpacing:5,color:dark?"rgba(196,149,106,0.45)":"#A09890",fontWeight:500}}>{en}</div><div style={{fontSize:14,letterSpacing:3,color:dark?"rgba(255,255,255,0.8)":"#2C2420",fontWeight:300,marginTop:5}}>{ja}</div><div style={{width:22,height:1,background:"#C4956A",marginTop:14,marginLeft:center?"auto":0,marginRight:center?"auto":0}}/></div>;}
 function FS({t,children}){return<div><div style={{fontSize:14,fontWeight:600,color:"#2C2420",letterSpacing:1,marginBottom:20}}>{t}</div>{children}</div>;}
 function Fi({l,v,s,p,m,rows=2,type}){return<div style={{marginBottom:14}}><div style={S.fl}>{l}</div>{m?<textarea value={v} onChange={e=>s(e.target.value)} placeholder={p} rows={rows} style={{...S.inp,resize:"vertical",minHeight:rows*24}}/>:<input type={type||"text"} value={v} onChange={e=>s(e.target.value)} placeholder={p} style={S.inp}/>}</div>;}
-function ImgS({src,go,cl,tall,small}){if(src)return<div style={{position:"relative",marginBottom:6}}><img src={src} alt="" style={{width:"100%",borderRadius:8,display:"block",maxHeight:tall?200:small?90:140,objectFit:"cover"}}/><button onClick={cl} style={{position:"absolute",top:5,right:5,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>;return<button onClick={go} style={{width:"100%",height:tall?120:small?56:88,border:"1.5px dashed #D5D0CA",borderRadius:8,background:"#FAFAF8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5AFA8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span style={{fontSize:10,color:"#A09890"}}>画像を選択</span></button>;}
-
-/* ━━━ タグ選択（ドロップダウン＋自由入力） ━━━ */
-const TAG_OPTIONS=["","1F","2F","3F"];
-function TagSelect({value,onChange}){
-  const isCustom=value&&!TAG_OPTIONS.includes(value);
-  const[custom,setCustom]=useState(isCustom);
-  const toggle=()=>{if(custom){onChange("");setCustom(false);}else{setCustom(true);}};
-  if(custom){
-    return<div style={{display:"flex",gap:4,alignItems:"center"}}>
-      <input value={value} onChange={e=>onChange(e.target.value)} style={{...S.inp,width:60,padding:"5px 7px",textAlign:"center",fontSize:11}} placeholder="タグ"/>
-      <button onClick={toggle} style={{background:"none",border:"none",color:"#C4956A",fontSize:10,cursor:"pointer",whiteSpace:"nowrap"}}>▼</button>
-    </div>;
-  }
-  return<div style={{display:"flex",gap:4,alignItems:"center"}}>
-    <select value={value} onChange={e=>onChange(e.target.value)} style={{...S.inp,width:60,padding:"5px 4px",fontSize:11,appearance:"auto"}}>
-      <option value="">タグ</option>{TAG_OPTIONS.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}
-    </select>
-    <button onClick={toggle} style={{background:"none",border:"none",color:"#C4956A",fontSize:10,cursor:"pointer",whiteSpace:"nowrap"}}>✎</button>
-  </div>;
+function ImgS({src,go,cl,tall,small,uploading}){
+  if(uploading)return<div style={{width:"100%",height:tall?120:small?56:88,border:"1.5px dashed #C4956A",borderRadius:8,background:"rgba(196,149,106,0.04)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:6}}><span style={{fontSize:11,color:"#C4956A",letterSpacing:1}}>アップロード中...</span></div>;
+  if(src)return<div style={{position:"relative",marginBottom:6}}><img src={src} alt="" style={{width:"100%",borderRadius:8,display:"block",maxHeight:tall?200:small?90:140,objectFit:"cover"}}/><button onClick={cl} style={{position:"absolute",top:5,right:5,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>;
+  return<button onClick={go} style={{width:"100%",height:tall?120:small?56:88,border:"1.5px dashed #D5D0CA",borderRadius:8,background:"#FAFAF8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5AFA8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span style={{fontSize:10,color:"#A09890"}}>画像を選択</span></button>;
 }
+const TAG_OPTIONS=["","1F","2F","3F"];
+function TagSelect({value,onChange}){const isCustom=value&&!TAG_OPTIONS.includes(value);const[custom,setCustom]=useState(isCustom);
+  if(custom)return<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={value} onChange={e=>onChange(e.target.value)} style={{...S.inp,width:60,padding:"5px 7px",textAlign:"center",fontSize:11}} placeholder="タグ"/><button onClick={()=>{onChange("");setCustom(false);}} style={{background:"none",border:"none",color:"#C4956A",fontSize:10,cursor:"pointer"}}>▼</button></div>;
+  return<div style={{display:"flex",gap:4,alignItems:"center"}}><select value={value} onChange={e=>onChange(e.target.value)} style={{...S.inp,width:60,padding:"5px 4px",fontSize:11,appearance:"auto"}}><option value="">タグ</option>{TAG_OPTIONS.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}</select><button onClick={()=>setCustom(true)} style={{background:"none",border:"none",color:"#C4956A",fontSize:10,cursor:"pointer"}}>✎</button></div>;
+}
+function MoveButtons({index,total,onMove}){return<div style={{display:"flex",flexDirection:"column",gap:2,justifyContent:"center"}}>{index>0&&<button onClick={()=>onMove(index,index-1)} style={S.mvB}>▲</button>}{index<total-1&&<button onClick={()=>onMove(index,index+1)} style={S.mvB}>▼</button>}</div>;}
 
-/* ━━━ 並べ替えボタン ━━━ */
-function MoveButtons({index,total,onMove}){
-  return<div style={{display:"flex",flexDirection:"column",gap:2,justifyContent:"center"}}>
-    {index>0&&<button onClick={()=>onMove(index,index-1)} style={S.mvB}>▲</button>}
-    {index<total-1&&<button onClick={()=>onMove(index,index+1)} style={S.mvB}>▼</button>}
-  </div>;
+/* ━━━ QRコード（外部API利用） ━━━ */
+function QRCode({url,size=160}){
+  return<img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&margin=8`} alt="QR" style={{width:size,height:size,borderRadius:8,display:"block"}}/>;
 }
 
 /* ━━━ App ━━━ */
@@ -193,12 +180,28 @@ function LS({onLoad,onBack}){const[list,setList]=useState([]);const[ld,setLd]=us
 const TABS=[{id:"basic",l:"基本"},{id:"concept",l:"コンセプト"},{id:"plan",l:"間取り"},{id:"exterior",l:"外観"},{id:"interior",l:"内装"},{id:"3d",l:"3D"},{id:"spec",l:"仕様"},{id:"price",l:"価格"},{id:"contact",l:"連絡先"}];
 
 function Ed({data,setData,tab,setTab,onPv,sid:shareId,onSave,onLoad,onNew,onList,err,setErr,onLogout}){
-  const u=(p,v)=>up(setData,p,v);const[saving,setSaving]=useState(false);const[showSh,setShowSh]=useState(false);const[sid,setSid]=useState(shareId);
+  const u=(p,v)=>up(setData,p,v);const[saving,setSaving]=useState(false);const[showSh,setShowSh]=useState(false);const[sid,setSid]=useState(shareId);const[showQr,setShowQr]=useState(false);
   useEffect(()=>{setSid(shareId);},[shareId]);
   const doSave=async()=>{setSaving(true);const id=await onSave();if(id){setSid(id);setShowSh(true);}setSaving(false);};
   const shareUrl=sid?`${location.origin}${location.pathname}?v=1#${sid}`:"";
   return<>
-    <div style={{...S.eH,flexWrap:"wrap",gap:8}}><div style={{flex:1,minWidth:100}}><div style={{fontSize:10,letterSpacing:3,color:"#A09890",marginBottom:2}}>KITA HOUSING</div><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>提案書作成</div></div><div style={{display:"flex",gap:5,flexWrap:"wrap"}}><button onClick={onNew} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>新規</button><button onClick={onList} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>一覧</button><button onClick={doSave} disabled={saving} style={{...S.smB,background:"#C4956A",color:"#fff"}}>{saving?"...":"保存"}</button><button onClick={onPv} style={{...S.smB,background:"#2C2420",color:"#fff"}}>▶</button></div></div>
+    <div style={{...S.eH,flexWrap:"wrap",gap:8}}><div style={{flex:1,minWidth:100}}><div style={{fontSize:10,letterSpacing:3,color:"#A09890",marginBottom:2}}>KITA HOUSING</div><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>提案書作成</div></div><div style={{display:"flex",gap:5,flexWrap:"wrap"}}><button onClick={onNew} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>新規</button><button onClick={onList} style={{...S.smB,background:"#F0EDE8",color:"#6B6560"}}>一覧</button><button onClick={doSave} disabled={saving} style={{...S.smB,background:"#C4956A",color:"#fff"}}>{saving?"保存中...":"保存"}</button><button onClick={onPv} style={{...S.smB,background:"#2C2420",color:"#fff"}}>▶</button></div></div>
+
+    {/* ★ 共有URLバー（保存済みの場合常時表示） */}
+    {sid&&<div style={{padding:"8px 16px",background:"#F5F3F0",borderBottom:"1px solid #EDEAE6",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:9,color:"#A09890",letterSpacing:1,marginBottom:2}}>共有URL（お客様用）</div>
+        <div style={{fontSize:10,color:"#6B6560",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{shareUrl}</div>
+      </div>
+      <button onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);}catch(e){}}} style={{...S.smB,background:"#2C2420",color:"#fff",flexShrink:0,fontSize:10,padding:"5px 10px"}}>コピー</button>
+      <button onClick={()=>setShowQr(!showQr)} style={{...S.smB,background:"#fff",color:"#6B6560",flexShrink:0,fontSize:10,padding:"5px 10px",border:"1px solid #E5E0DA"}}>QR</button>
+    </div>}
+    {/* QRコード表示 */}
+    {showQr&&sid&&<div style={{padding:"16px",background:"#fff",borderBottom:"1px solid #EDEAE6",display:"flex",flexDirection:"column",alignItems:"center",gap:8,flexShrink:0}}>
+      <QRCode url={shareUrl} size={180}/>
+      <div style={{fontSize:10,color:"#A09890",letterSpacing:1}}>#{sid}</div>
+    </div>}
+
     {showSh&&sid&&<ShMdl url={shareUrl} id={sid} onClose={()=>setShowSh(false)}/>}
     {err&&<div style={{padding:"10px 16px",background:"#FFF0F0",fontSize:11,color:"#C44",display:"flex",justifyContent:"space-between"}}><span>{err}</span><button onClick={()=>setErr(null)} style={{background:"none",border:"none",color:"#C44",cursor:"pointer"}}>✕</button></div>}
     <div style={S.tB}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...S.tI,color:tab===t.id?"#2C2420":"#A09890",borderBottom:tab===t.id?"2px solid #C4956A":"2px solid transparent",fontWeight:tab===t.id?600:400}}>{t.l}</button>)}</div>
@@ -211,7 +214,9 @@ function Ed({data,setData,tab,setTab,onPv,sid:shareId,onSave,onLoad,onNew,onList
 
 function ShMdl({url,id,onClose}){const[cp,setCp]=useState(false);const copy=async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}};
   return<div style={{position:"absolute",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
-    <div style={{fontSize:16,fontWeight:600,color:"#2C2420",marginBottom:4}}>保存しました</div><div style={{fontSize:11,color:"#A09890",marginBottom:20,lineHeight:1.8}}>以下のURLをお客様に共有してください。</div>
+    <div style={{fontSize:16,fontWeight:600,color:"#2C2420",marginBottom:4}}>保存しました</div><div style={{fontSize:11,color:"#A09890",marginBottom:20,lineHeight:1.8}}>URLまたはQRコードをお客様に共有してください。</div>
+    {/* QRコード */}
+    <div style={{display:"flex",justifyContent:"center",marginBottom:16}}><QRCode url={url} size={180}/></div>
     <div style={{background:"#F5F3F0",borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:10,color:"#A09890",letterSpacing:2,marginBottom:4}}>共有コード</div><div style={{fontSize:28,fontWeight:600,color:"#2C2420",letterSpacing:6,fontFamily:"monospace"}}>{id}</div></div>
     <div style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px",marginBottom:16,wordBreak:"break-all",fontSize:10,color:"#6B6560",fontFamily:"monospace"}}>{url}</div>
     <div style={{display:"flex",gap:8}}><button onClick={copy} style={{flex:1,padding:"12px 0",background:"#2C2420",color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",letterSpacing:1}}>{cp?"✓ コピー済み":"URLをコピー"}</button><button onClick={onClose} style={{padding:"12px 18px",background:"#F0EDE8",color:"#6B6560",border:"none",borderRadius:8,fontSize:12,cursor:"pointer"}}>閉じる</button></div>
@@ -219,83 +224,36 @@ function ShMdl({url,id,onClose}){const[cp,setCp]=useState(false);const copy=asyn
 }
 
 /* ━━━ Editor Tabs ━━━ */
-function EBas({d,u}){const img=useImg(b=>u("coverImage",b));return<FS t="基本情報"><Fi l="お客様名" v={d.customerName} s={v=>u("customerName",v)} p="例：山田 太郎"/><Fi l="担当者名" v={d.staffName} s={v=>u("staffName",v)}/><Fi l="プランタイトル" v={d.planTitle} s={v=>u("planTitle",v)}/><div style={{marginTop:8}}/><div style={S.fl}>カバー画像</div><ImgS src={d.coverImage} go={img.go} cl={()=>u("coverImage",null)} tall/>{img.el}</FS>;}
+function EBas({d,u}){const img=useImg(b=>u("coverImage",b));return<FS t="基本情報"><Fi l="お客様名" v={d.customerName} s={v=>u("customerName",v)} p="例：山田 太郎"/><Fi l="担当者名" v={d.staffName} s={v=>u("staffName",v)}/><Fi l="プランタイトル" v={d.planTitle} s={v=>u("planTitle",v)}/><div style={{marginTop:8}}/><div style={S.fl}>カバー画像</div><ImgS src={d.coverImage} go={img.go} cl={()=>u("coverImage",null)} tall uploading={img.uploading}/>{img.el}</FS>;}
 function ECon({d,u}){return<FS t="コンセプト"><Fi l="キャッチコピー" v={d.concept.headline} s={v=>u("concept.headline",v)} m/><Fi l="説明文" v={d.concept.body} s={v=>u("concept.body",v)} m rows={4}/><div style={S.fl}>キーワード</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{d.concept.tags.map((t,i)=><input key={i} value={t} onChange={e=>{const a=[...d.concept.tags];a[i]=e.target.value;u("concept.tags",a);}} style={S.inp}/>)}</div></FS>;}
 function EPla({d,u}){return<FS t="間取り"><Fi l="タイプ" v={d.plan.type} s={v=>u("plan.type",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Fi l="㎡" v={d.plan.area} s={v=>u("plan.area",v)}/><Fi l="坪" v={d.plan.tsubo} s={v=>u("plan.tsubo",v)}/></div>{d.plan.floors.map((fl,fi)=><FE key={fi} fl={fl} fi={fi} d={d} u={u}/>)}{d.plan.floors.length<3&&<button onClick={()=>u("plan.floors",[...d.plan.floors,mkFloor(`${d.plan.floors.length+1}F`)])} style={{...S.aB,background:"#F0EDE8"}}>＋ フロア</button>}</FS>;}
-function FE({fl,fi,d,u}){const img=useImg(b=>u(`plan.floors.${fi}.image`,b));return<div style={{marginBottom:16,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:"#2C2420",color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u(`plan.floors.${fi}.label`,e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>{d.plan.floors.length>1&&<button onClick={()=>u("plan.floors",d.plan.floors.filter((_,j)=>j!==fi))} style={S.xB}>✕</button>}</div><ImgS src={fl.image} go={img.go} cl={()=>u(`plan.floors.${fi}.image`,null)}/>{img.el}</div>;}
+function FE({fl,fi,d,u}){const img=useImg(b=>u(`plan.floors.${fi}.image`,b));return<div style={{marginBottom:16,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:"#2C2420",color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u(`plan.floors.${fi}.label`,e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>{d.plan.floors.length>1&&<button onClick={()=>u("plan.floors",d.plan.floors.filter((_,j)=>j!==fi))} style={S.xB}>✕</button>}</div><ImgS src={fl.image} go={img.go} cl={()=>u(`plan.floors.${fi}.image`,null)} uploading={img.uploading}/>{img.el}</div>;}
 
-/* ★ 外観（一括アップロード対応） ★ */
 function EExt({d,u}){
-  const bulk=useBulkImg((results)=>{
-    const views=[...d.exterior.views];
-    for(const r of results){
-      const idx=views.findIndex(v=>v.label===r.label);
-      if(idx>=0){views[idx]={...views[idx],image:r.image};}
-      else{views.push({label:r.label,image:r.image});}
-    }
-    u("exterior.views",views);
-  });
+  const bulk=useBulkImg((results)=>{const views=[...d.exterior.views];for(const r of results){const idx=views.findIndex(v=>v.label===r.label);if(idx>=0)views[idx]={...views[idx],image:r.image};else views.push({label:r.label,image:r.image});}u("exterior.views",views);});
   const move=(from,to)=>{const v=[...d.exterior.views];const[item]=v.splice(from,1);v.splice(to,0,item);u("exterior.views",v);};
   return<FS t="外観パース">
-    <button onClick={bulk.go} style={{...S.bulkBtn,marginBottom:12}}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4956A" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
-      画像を一括追加
-    </button>{bulk.el}
+    <button onClick={bulk.go} disabled={bulk.uploading} style={{...S.bulkBtn,marginBottom:12}}>{bulk.uploading?"アップロード中...":"画像を一括追加"}</button>{bulk.el}
     {d.exterior.views.map((v,i)=><ExtViewItem key={i} v={v} i={i} d={d} u={u} total={d.exterior.views.length} onMove={move}/>)}
     <button onClick={()=>u("exterior.views",[...d.exterior.views,mkExt("")])} style={S.aB}>＋ 手動で追加</button>
     <div style={{marginTop:16}}/><Fi l="説明" v={d.exterior.description} s={v=>u("exterior.description",v)} m rows={3}/>
   </FS>;
 }
-function ExtViewItem({v,i,d,u,total,onMove}){
-  const img=useImg(b=>u(`exterior.views.${i}.image`,b));
-  return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8,alignItems:"stretch"}}>
-    <MoveButtons index={i} total={total} onMove={onMove}/>
-    <div style={{flex:1}}>
-      <div style={{display:"flex",gap:6,marginBottom:6}}>
-        <input value={v.label} onChange={e=>u(`exterior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/>
-        <button onClick={()=>u("exterior.views",d.exterior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button>
-      </div>
-      <ImgS src={v.image} go={img.go} cl={()=>u(`exterior.views.${i}.image`,null)} small/>{img.el}
-    </div>
-  </div>;
-}
+function ExtViewItem({v,i,d,u,total,onMove}){const img=useImg(b=>u(`exterior.views.${i}.image`,b));
+  return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8,alignItems:"stretch"}}><MoveButtons index={i} total={total} onMove={onMove}/><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6}}><input value={v.label} onChange={e=>u(`exterior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><button onClick={()=>u("exterior.views",d.exterior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`exterior.views.${i}.image`,null)} small uploading={img.uploading}/>{img.el}</div></div>;}
 
-/* ★ 内装（一括アップロード＋タグドロップダウン対応） ★ */
 function EInt({d,u}){
-  const bulk=useBulkImg((results)=>{
-    const views=[...d.interior.views];
-    for(const r of results){
-      const idx=views.findIndex(v=>v.label===r.label);
-      if(idx>=0){views[idx]={...views[idx],image:r.image};}
-      else{views.push({label:r.label,image:r.image,tag:""});}
-    }
-    u("interior.views",views);
-  });
+  const bulk=useBulkImg((results)=>{const views=[...d.interior.views];for(const r of results){const idx=views.findIndex(v=>v.label===r.label);if(idx>=0)views[idx]={...views[idx],image:r.image};else views.push({label:r.label,image:r.image,tag:""});}u("interior.views",views);});
   const move=(from,to)=>{const v=[...d.interior.views];const[item]=v.splice(from,1);v.splice(to,0,item);u("interior.views",v);};
   return<FS t="内装 3Dビュー">
-    <button onClick={bulk.go} style={{...S.bulkBtn,marginBottom:12}}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4956A" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
-      画像を一括追加
-    </button>{bulk.el}
+    <button onClick={bulk.go} disabled={bulk.uploading} style={{...S.bulkBtn,marginBottom:12}}>{bulk.uploading?"アップロード中...":"画像を一括追加"}</button>{bulk.el}
     {d.interior.views.map((v,i)=><IntViewItem key={i} v={v} i={i} d={d} u={u} total={d.interior.views.length} onMove={move}/>)}
     <button onClick={()=>u("interior.views",[...d.interior.views,mkView("","")])} style={S.aB}>＋ 手動で追加</button>
     <div style={{marginTop:16}}/><Fi l="説明" v={d.interior.description} s={v=>u("interior.description",v)} m rows={3}/>
   </FS>;
 }
-function IntViewItem({v,i,d,u,total,onMove}){
-  const img=useImg(b=>u(`interior.views.${i}.image`,b));
-  return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8,alignItems:"stretch"}}>
-    <MoveButtons index={i} total={total} onMove={onMove}/>
-    <div style={{flex:1}}>
-      <div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
-        <input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/>
-        <TagSelect value={v.tag||""} onChange={val=>u(`interior.views.${i}.tag`,val)}/>
-        <button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button>
-      </div>
-      <ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small/>{img.el}
-    </div>
-  </div>;
-}
+function IntViewItem({v,i,d,u,total,onMove}){const img=useImg(b=>u(`interior.views.${i}.image`,b));
+  return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8,alignItems:"stretch"}}><MoveButtons index={i} total={total} onMove={onMove}/><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}><input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><TagSelect value={v.tag||""} onChange={val=>u(`interior.views.${i}.tag`,val)}/><button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small uploading={img.uploading}/>{img.el}</div></div>;}
 
 function ESpe({d,u}){return<FS t="仕様">{d.specs.map((s,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={s.category} onChange={e=>u(`specs.${i}.category`,e.target.value)} style={{...S.inp,width:68}} placeholder="項目"/><input value={s.value} onChange={e=>u(`specs.${i}.value`,e.target.value)} style={{...S.inp,flex:1}} placeholder="内容"/><button onClick={()=>u("specs",d.specs.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("specs",[...d.specs,{category:"",value:""}])} style={S.aB}>＋</button></FS>;}
 function EPri({d,u}){return<FS t="資金計画">{d.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>u(`pricing.items.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="項目"/><input value={it.amount} onChange={e=>u(`pricing.items.${i}.amount`,e.target.value)} style={{...S.inp,width:110,textAlign:"right"}} placeholder="金額"/><button onClick={()=>u("pricing.items",d.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("pricing.items",[...d.pricing.items,{label:"",amount:""}])} style={S.aB}>＋</button><Fi l="合計" v={d.pricing.total} s={v=>u("pricing.total",v)} p="3,100万円"/><Fi l="備考" v={d.pricing.notes} s={v=>u("pricing.notes",v)} m rows={2}/></FS>;}
