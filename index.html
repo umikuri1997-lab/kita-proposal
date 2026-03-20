@@ -60,6 +60,35 @@ function fileToLabel(filename){
   return name.trim()||"無題";
 }
 
+/* ━━━ 画像圧縮（長辺1600px、JPEG 75%に自動変換） ━━━ */
+const MAX_IMG_SIZE=1600;
+const IMG_QUALITY=0.75;
+function compressImage(file){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width,h=img.height;
+      if(w>MAX_IMG_SIZE||h>MAX_IMG_SIZE){
+        if(w>h){h=Math.round(h*(MAX_IMG_SIZE/w));w=MAX_IMG_SIZE;}
+        else{w=Math.round(w*(MAX_IMG_SIZE/h));h=MAX_IMG_SIZE;}
+      }
+      const c=document.createElement("canvas");
+      c.width=w;c.height=h;
+      const ctx=c.getContext("2d");
+      ctx.drawImage(img,0,0,w,h);
+      resolve(c.toDataURL("image/jpeg",IMG_QUALITY));
+    };
+    img.onerror=()=>{
+      URL.revokeObjectURL(url);
+      // fallback: read as-is
+      const r=new FileReader();r.onload=ev=>resolve(ev.target.result);r.readAsDataURL(file);
+    };
+    img.src=url;
+  });
+}
+
 /* ━━━ 一括画像読み込み ━━━ */
 function useBulkImg(onResults){
   const ref=useRef(null);
@@ -69,7 +98,7 @@ function useBulkImg(onResults){
     if(!files.length)return;
     const results=[];
     for(const f of files){
-      const b64=await new Promise((res)=>{const r=new FileReader();r.onload=ev=>res(ev.target.result);r.readAsDataURL(f);});
+      const b64=await compressImage(f);
       results.push({label:fileToLabel(f.name),image:b64});
     }
     onResults(results);
@@ -80,7 +109,7 @@ function useBulkImg(onResults){
 }
 
 /* ━━━ Shared Helpers ━━━ */
-function useImg(cb){const r=useRef(null);const el=<input ref={r} type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>cb(ev.target.result);rd.readAsDataURL(f);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el};}
+function useImg(cb){const r=useRef(null);const el=<input ref={r} type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;const b64=await compressImage(f);cb(b64);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el};}
 function up(sd,p,v){sd(prev=>{const n=JSON.parse(JSON.stringify(prev));const k=p.split(".");let o=n;for(let i=0;i<k.length-1;i++)o=/^\d+$/.test(k[i])?o[+k[i]]:o[k[i]];const l=k[k.length-1];o[/^\d+$/.test(l)?+l:l]=v;return n;});}
 function Sh({children,full}){return<div style={{...S.shell,maxWidth:full?"none":"640px"}}>{children}</div>;}
 function PSec({children,bg,last}){return<div style={{padding:last?"72px 5vw 80px":"72px 5vw",background:bg}}><div style={{maxWidth:800,margin:"0 auto"}}>{children}</div></div>;}
