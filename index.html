@@ -52,9 +52,9 @@ async function uploadImage(base64){
 const mkFloor=(l)=>({label:l,image:null});
 const mkView=(l,t)=>({label:l,image:null,tag:t||""});
 const mkExt=(l)=>({label:l,image:null});
-const DEFAULT={customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{type:"4LDK ＋ WIC ＋ SIC",area:"112.62",tsubo:"34.06",floors:[{label:"1F",image:null},{label:"2F",image:null}]},exterior:{description:"シンプルモダンの外観に、木目調アクセントで温かみをプラス。",views:[]},interior:{description:"無垢材のフローリングとホワイトの壁を基調に、上質で落ち着いた空間を演出。",views:[]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
+const DEFAULT={customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{type:"4LDK ＋ WIC ＋ SIC",area:"112.62",tsubo:"34.06",floors:[{label:"1F",image:null},{label:"2F",image:null}]},exterior:{description:"シンプルモダンの外観に、木目調アクセントで温かみをプラス。",views:[]},interior:{description:"無垢材のフローリングとホワイトの壁を基調に、上質で落ち着いた空間を演出。",views:[]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{show:true,items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
 const GR=["#A0896D,#C4B5A0","#6B8F71,#8BA893","#7E8B9A,#9AABB8","#9A8B7E,#B8A99A","#8B7A9B,#A899B8"];
-const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(let i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
+const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";let r="";for(let i=0;i<16;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
 
 /* ━━━ ファイル名→ビュー名 ━━━ */
 function fileToLabel(fn){let n=fn.replace(/\.[^.]+$/,"");const px=["パース図-","パース図_","パース-","パース_","パース図 "];for(const p of px){if(n.startsWith(p)){n=n.slice(p.length);break;}}return n.trim()||"無題";}
@@ -217,7 +217,7 @@ function ShMdl({url,id,onClose}){const[cp,setCp]=useState(false);const copy=asyn
     <div style={{fontSize:16,fontWeight:600,color:"#2C2420",marginBottom:4}}>保存しました</div><div style={{fontSize:11,color:"#A09890",marginBottom:20,lineHeight:1.8}}>URLまたはQRコードをお客様に共有してください。</div>
     {/* QRコード */}
     <div style={{display:"flex",justifyContent:"center",marginBottom:16}}><QRCode url={url} size={180}/></div>
-    <div style={{background:"#F5F3F0",borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:10,color:"#A09890",letterSpacing:2,marginBottom:4}}>共有コード</div><div style={{fontSize:28,fontWeight:600,color:"#2C2420",letterSpacing:6,fontFamily:"monospace"}}>{id}</div></div>
+    <div style={{background:"#F5F3F0",borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:10,color:"#A09890",letterSpacing:2,marginBottom:4}}>共有コード</div><div style={{fontSize:16,fontWeight:600,color:"#2C2420",letterSpacing:3,fontFamily:"monospace",wordBreak:"break-all"}}>{id}</div></div>
     <div style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px",marginBottom:16,wordBreak:"break-all",fontSize:10,color:"#6B6560",fontFamily:"monospace"}}>{url}</div>
     <div style={{display:"flex",gap:8}}><button onClick={copy} style={{flex:1,padding:"12px 0",background:"#2C2420",color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",letterSpacing:1}}>{cp?"✓ コピー済み":"URLをコピー"}</button><button onClick={onClose} style={{padding:"12px 18px",background:"#F0EDE8",color:"#6B6560",border:"none",borderRadius:8,fontSize:12,cursor:"pointer"}}>閉じる</button></div>
   </div></div>;
@@ -256,11 +256,62 @@ function IntViewItem({v,i,d,u,total,onMove}){const img=useImg(b=>u(`interior.vie
   return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8,alignItems:"stretch"}}><MoveButtons index={i} total={total} onMove={onMove}/><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}><input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><TagSelect value={v.tag||""} onChange={val=>u(`interior.views.${i}.tag`,val)}/><button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small uploading={img.uploading}/>{img.el}</div></div>;}
 
 function ESpe({d,u}){return<FS t="仕様">{d.specs.map((s,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={s.category} onChange={e=>u(`specs.${i}.category`,e.target.value)} style={{...S.inp,width:68}} placeholder="項目"/><input value={s.value} onChange={e=>u(`specs.${i}.value`,e.target.value)} style={{...S.inp,flex:1}} placeholder="内容"/><button onClick={()=>u("specs",d.specs.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("specs",[...d.specs,{category:"",value:""}])} style={S.aB}>＋</button></FS>;}
-function EPri({d,u}){return<FS t="資金計画">{d.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>u(`pricing.items.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="項目"/><input value={it.amount} onChange={e=>u(`pricing.items.${i}.amount`,e.target.value)} style={{...S.inp,width:110,textAlign:"right"}} placeholder="金額"/><button onClick={()=>u("pricing.items",d.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("pricing.items",[...d.pricing.items,{label:"",amount:""}])} style={S.aB}>＋</button><Fi l="合計" v={d.pricing.total} s={v=>u("pricing.total",v)} p="3,100万円"/><Fi l="備考" v={d.pricing.notes} s={v=>u("pricing.notes",v)} m rows={2}/></FS>;}
+function EPri({d,u}){const show=d.pricing.show!==false;return<FS t="資金計画">
+  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:"10px 12px",background:"#fff",borderRadius:8,border:"1px solid #EDEAE6"}}>
+    <span style={{fontSize:12,color:"#6B6560",flex:1}}>お客様に金額を表示する</span>
+    <button onClick={()=>u("pricing.show",!show)} style={{width:44,height:24,borderRadius:12,border:"none",background:show?"#C4956A":"#D5D0CA",cursor:"pointer",position:"relative",transition:"background .2s"}}>
+      <div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:show?22:2,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+    </button>
+  </div>
+  {show&&<>{d.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>u(`pricing.items.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="項目"/><input value={it.amount} onChange={e=>u(`pricing.items.${i}.amount`,e.target.value)} style={{...S.inp,width:110,textAlign:"right"}} placeholder="金額"/><button onClick={()=>u("pricing.items",d.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("pricing.items",[...d.pricing.items,{label:"",amount:""}])} style={S.aB}>＋</button><Fi l="合計" v={d.pricing.total} s={v=>u("pricing.total",v)} p="3,100万円"/><Fi l="備考" v={d.pricing.notes} s={v=>u("pricing.notes",v)} m rows={2}/></>}
+</FS>;}
 function ECon2({d,u}){return<FS t="連絡先"><Fi l="電話" v={d.contact.phone} s={v=>u("contact.phone",v)}/><Fi l="受付" v={d.contact.hours} s={v=>u("contact.hours",v)}/><Fi l="住所" v={d.contact.address} s={v=>u("contact.address",v)}/></FS>;}
 
+/* ━━━ 共有パネル（お客様用） ━━━ */
+function SharePanel({onClose}){
+  const url=location.href;
+  const[cp,setCp]=useState(false);
+  const copy=async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}};
+  const lineUrl=`https://line.me/R/msg/text/?${encodeURIComponent(url)}`;
+  const webShare=async()=>{try{await navigator.share({title:document.title,url});}catch(e){}};
+  const canShare=typeof navigator.share==="function";
+  return<div style={{position:"fixed",inset:0,zIndex:9000,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
+    <div style={{background:"rgba(0,0,0,0.4)",position:"absolute",inset:0}}/>
+    <div style={{position:"relative",background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 24px 32px",maxWidth:640,margin:"0 auto",width:"100%"}} onClick={e=>e.stopPropagation()}>
+      {/* Handle bar */}
+      <div style={{width:36,height:4,borderRadius:2,background:"#E5E0DA",margin:"0 auto 20px"}}/>
+      <div style={{fontSize:15,fontWeight:600,color:"#2C2420",marginBottom:20,textAlign:"center"}}>この提案書を共有</div>
+      {/* QR */}
+      <div style={{display:"flex",justifyContent:"center",marginBottom:20}}><QRCode url={url} size={160}/></div>
+      {/* Buttons */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {canShare&&<button onClick={webShare} style={{...S.shareBtn,background:"#2C2420",color:"#fff"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          共有する
+        </button>}
+        <button onClick={()=>window.open(lineUrl,"_blank")} style={{...S.shareBtn,background:"#06C755",color:"#fff"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+          LINEで送る
+        </button>
+        <button onClick={copy} style={{...S.shareBtn,background:"#fff",color:"#2C2420",border:"1px solid #E5E0DA"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          {cp?"✓ コピーしました":"URLをコピー"}
+        </button>
+      </div>
+      <button onClick={onClose} style={{marginTop:16,width:"100%",padding:"12px 0",background:"none",border:"none",color:"#A09890",fontSize:12,cursor:"pointer",letterSpacing:1}}>閉じる</button>
+    </div>
+  </div>;
+}
+
 /* ━━━ Views ━━━ */
-function CV({data,onWt,onZoom}){const ref=useRef(null);const[sy,setSy]=useState(0);useEffect(()=>{const el=ref.current;if(!el)return;const h=()=>setSy(el.scrollTop);el.addEventListener("scroll",h,{passive:true});return()=>el.removeEventListener("scroll",h);},[]);return<div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div>;}
+function CV({data,onWt,onZoom}){const ref=useRef(null);const[sy,setSy]=useState(0);const[showShare,setShowShare]=useState(false);useEffect(()=>{const el=ref.current;if(!el)return;const h=()=>setSy(el.scrollTop);el.addEventListener("scroll",h,{passive:true});return()=>el.removeEventListener("scroll",h);},[]);return<>
+  <div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div>
+  {/* 共有フローティングボタン */}
+  <button onClick={()=>setShowShare(true)} style={{position:"fixed",bottom:24,right:24,zIndex:100,width:52,height:52,borderRadius:"50%",background:"#2C2420",border:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.25)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+  </button>
+  {showShare&&<SharePanel onClose={()=>setShowShare(false)}/>}
+</>;}
 function PV({data,onBack,onWt,onZoom}){const ref=useRef(null);const[sy,setSy]=useState(0);useEffect(()=>{const el=ref.current;if(!el)return;const h=()=>setSy(el.scrollTop);el.addEventListener("scroll",h,{passive:true});return()=>el.removeEventListener("scroll",h);},[]);return<><button onClick={onBack} style={S.bk}>◀ 編集</button><div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div></>;}
 
 /* ━━━ Presentation ━━━ */
@@ -277,7 +328,7 @@ function Pres({data,sy,onWt,onZoom}){
     <div style={{background:"#1A1614",padding:"0 0 48px"}}><div style={{padding:"72px 5vw 0",maxWidth:800,margin:"0 auto"}}><Lb en="INTERIOR" ja="内装デザイン" dark/></div>{iv.length>0&&<>{iTags.length>2&&<div style={{display:"flex",gap:6,padding:"0 5vw 16px",maxWidth:800,margin:"0 auto",overflowX:"auto"}}>{iTags.map(t=><button key={t} onClick={()=>setIFlt(t)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,border:"1px solid",borderColor:iFlt===t?"#C4956A":"rgba(255,255,255,0.12)",background:iFlt===t?"rgba(196,149,106,0.15)":"transparent",color:iFlt===t?"#C4956A":"rgba(255,255,255,0.45)",fontSize:11,cursor:"pointer",letterSpacing:1}}>{t==="ALL"?"すべて":t}</button>)}</div>}<GH items={iF} idx={ii} setIdx={setIi} onZoom={zoom} dark showTag/></>}<div style={{padding:"20px 5vw 0",maxWidth:800,margin:"0 auto"}}><p style={{fontSize:13,lineHeight:2.2,color:"rgba(255,255,255,0.45)",fontWeight:300}}>{data.interior.description}</p></div></div>
     {data.viewer3dUrl&&<div style={{background:"#111",padding:"48px 5vw"}}><div style={{maxWidth:800,margin:"0 auto"}}><Lb en="3D WALKTHROUGH" ja="3Dウォークスルー" dark center/><button onClick={onWt} style={{width:"100%",maxWidth:400,margin:"0 auto",padding:"22px 0",border:"1px solid rgba(196,149,106,0.3)",borderRadius:14,background:"rgba(196,149,106,0.06)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><div style={{width:56,height:56,borderRadius:"50%",border:"2px solid rgba(196,149,106,0.35)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="#C4956A"><polygon points="5,3 19,12 5,21"/></svg></div><div style={{fontSize:13,color:"#C4956A",letterSpacing:2,fontWeight:500}}>全画面で3Dビューを開く</div></button></div></div>}
     <PSec bg="#fff"><Lb en="SPEC" ja="主要仕様"/><div style={{maxWidth:500}}>{data.specs.filter(s=>s.category).map((s,i)=><div key={i} style={{display:"flex",padding:"13px 0",borderBottom:i<data.specs.length-1?"1px solid #F0EDE8":"none",gap:14}}><span style={{fontSize:11,color:"#A09890",fontWeight:500,letterSpacing:2,minWidth:48}}>{s.category}</span><span style={{fontSize:13,color:"#2C2420",lineHeight:1.8}}>{s.value}</span></div>)}</div></PSec>
-    <PSec bg="#FAF8F5"><Lb en="PRICE" ja="資金計画"/><div style={{maxWidth:500}}>{data.pricing.items.filter(p=>p.label).map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"14px 0",borderBottom:i<data.pricing.items.length-1?"1px solid #EBE8E3":"none"}}><span style={{fontSize:13,color:"#6B6560"}}>{it.label}</span><span style={{fontSize:14,color:"#2C2420",fontWeight:500}}>{it.amount||"—"}</span></div>)}{data.pricing.total&&<div style={{marginTop:14,padding:"16px 0",borderTop:"2px solid #2C2420",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:13,color:"#2C2420",fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:22,color:"#2C2420",fontWeight:300}}>{data.pricing.total}</span></div>}{data.pricing.notes&&<div style={{marginTop:14,padding:14,background:"#EDEAE6",borderRadius:8,fontSize:11,color:"#A09890",lineHeight:2}}>※ {data.pricing.notes}</div>}</div></PSec>
+    {data.pricing.show!==false&&<PSec bg="#FAF8F5"><Lb en="PRICE" ja="資金計画"/><div style={{maxWidth:500}}>{data.pricing.items.filter(p=>p.label).map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"14px 0",borderBottom:i<data.pricing.items.length-1?"1px solid #EBE8E3":"none"}}><span style={{fontSize:13,color:"#6B6560"}}>{it.label}</span><span style={{fontSize:14,color:"#2C2420",fontWeight:500}}>{it.amount||"—"}</span></div>)}{data.pricing.total&&<div style={{marginTop:14,padding:"16px 0",borderTop:"2px solid #2C2420",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:13,color:"#2C2420",fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:22,color:"#2C2420",fontWeight:300}}>{data.pricing.total}</span></div>}{data.pricing.notes&&<div style={{marginTop:14,padding:14,background:"#EDEAE6",borderRadius:8,fontSize:11,color:"#A09890",lineHeight:2}}>※ {data.pricing.notes}</div>}</div></PSec>}
     <PSec bg="#2C2420" last><Lb en="CONTACT" ja="お問合せ" dark center/><div style={{textAlign:"center"}}><a href={`tel:${data.contact.phone.replace(/-/g,"")}`} style={{fontSize:"clamp(20px, 3vw, 28px)",color:"#fff",fontWeight:300,letterSpacing:3,display:"block",marginBottom:6}}>{data.contact.phone}</a><div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginBottom:32}}>{data.contact.hours}</div><div style={{width:36,height:1,background:"rgba(196,149,106,0.2)",margin:"0 auto 32px"}}/><div style={{fontSize:12,color:"rgba(255,255,255,0.25)",letterSpacing:2,lineHeight:2.4}}>喜多ハウジング株式会社<br/>{data.contact.address}</div>{data.staffName&&<div style={{marginTop:20,fontSize:12,color:"rgba(255,255,255,0.4)"}}>担当：{data.staffName}</div>}<div style={{marginTop:44,fontSize:9,color:"rgba(255,255,255,0.12)",letterSpacing:2}}>© 2026 KITA HOUSING</div></div></PSec>
   </>;
 }
@@ -343,6 +394,7 @@ const S={
   bk:{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:100,background:"rgba(44,36,32,0.85)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer",letterSpacing:1},
   bd:{fontSize:"clamp(13px, 1.5vw, 15px)",lineHeight:2.2,color:"#6B6560",fontWeight:300},
   tg:{padding:"14px 12px",background:"#fff",borderRadius:8,textAlign:"center",fontSize:12,color:"#2C2420",fontWeight:500,letterSpacing:2,boxShadow:"0 2px 10px rgba(0,0,0,0.03)"},
+  shareBtn:{width:"100%",padding:"14px 0",border:"none",borderRadius:10,fontSize:13,fontWeight:500,cursor:"pointer",letterSpacing:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10},
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
