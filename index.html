@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>喜多ハウジング 提案書</title>
+<title>ご契約提案書 | 喜多ハウジング</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236B8F71'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>契</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -23,13 +24,17 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:#C4956A !impor
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useRef,useEffect,useCallback}=React;
+const {useState,useRef,useEffect,useCallback,useMemo}=React;
 const WU="https://kita-proposal-api.kitahousing.workers.dev";
 const AK="kita_api_key";
+const ID_PREFIX="0c";
+const EXPIRY_DAYS=365;
 function getKey(){return localStorage.getItem(AK)||"";}
 function setKey(k){localStorage.setItem(AK,k);}
 async function api(path,{method="GET",body,auth=false}={}){
@@ -42,9 +47,17 @@ async function api(path,{method="GET",body,auth=false}={}){
 }
 const saveP=(id,d)=>api(`/api/proposals/${id}`,{method:"POST",body:{data:d},auth:true});
 const loadP=id=>api(`/api/proposals/${id}`);
+const loadPAuth=id=>api(`/api/proposals/${id}`,{auth:true});
 const listP=()=>api("/api/proposals",{auth:true});
 const delP=id=>api(`/api/proposals/${id}`,{method:"DELETE",auth:true});
 async function uploadImage(b64){return(await api("/api/images",{method:"POST",body:{data:b64},auth:true})).url;}
+const calcExpiry=d=>{if(!d)return null;const t=new Date(d);t.setDate(t.getDate()+EXPIRY_DAYS);return t.toISOString();};
+const fmtDate=s=>{if(!s)return"─";const d=new Date(s);return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;};
+const fmtDateShort=s=>{if(!s)return"─";const d=new Date(s);return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;};
+const remainDays=s=>{if(!s)return null;return Math.ceil((new Date(s)-new Date())/864e5);};
+function collectImages(d){const u=[];if(!d)return u;if(d.coverImage)u.push(d.coverImage);(d.plan?.floors||[]).forEach(f=>{if(f.image)u.push(f.image);});(d.exterior?.views||[]).forEach(v=>{if(v.image)u.push(v.image);});(d.interior?.views||[]).forEach(v=>{if(v.image)u.push(v.image);});(d.beforeAfter?.pairs||[]).forEach(p=>{if(p.before)u.push(p.before);if(p.after)u.push(p.after);});return u;}
+async function delImg(url){if(!url||typeof url!=="string")return;try{const m=url.match(/\/api\/images\/(.+)/);if(m)await api(`/api/images/${m[1]}`,{method:"DELETE",auth:true});}catch(e){}}
+async function delWithImages(id,d){try{const imgs=collectImages(d);await Promise.allSettled(imgs.map(u=>delImg(u)));}catch(e){}await delP(id);}
 
 /* ━━━ テーマ（差別化強化） ━━━ */
 const THEMES={
@@ -58,12 +71,11 @@ const THEMES={
 function T(d){return THEMES[d?.theme]||THEMES.gold;}
 
 const GR=["#A0896D,#C4B5A0","#6B8F71,#8BA893","#7E8B9A,#9AABB8","#9A8B7E,#B8A99A","#8B7A9B,#A899B8"];
-const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";let r="";for(let i=0;i<16;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
-const DEFAULT={theme:"gold",customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{area:"",tsubo:"",floors:[{label:"1F",image:null},{label:"2F",image:null}]},exterior:{description:"",views:[]},interior:{description:"",views:[]},beforeAfter:{show:true,pairs:[]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{show:true,items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
-
+const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";let r="";for(let i=0;i<16;i++)r+=c[Math.floor(Math.random()*c.length)];return ID_PREFIX+r;};
+const DEFAULT={dataType:"decided",updatedAt:null,expiresAt:null,theme:"gold",customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{area:"",tsubo:"",floors:[{label:"1F",image:null},{label:"2F",image:null}]},exterior:{description:"",views:[]},interior:{description:"",views:[]},beforeAfter:{show:true,pairs:[]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{show:true,items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
 function fileToLabel(fn){let n=fn.replace(/\.[^.]+$/,"");for(const p of["パース図-","パース図_","パース-","パース_","パース図 "])if(n.startsWith(p)){n=n.slice(p.length);break;}return n.trim()||"無題";}
-function compressImage(file){return new Promise(res=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(url);let w=img.width,h=img.height;const M=1600;if(w>M||h>M){if(w>h){h=Math.round(h*(M/w));w=M;}else{w=Math.round(w*(M/h));h=M;}}const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);res(c.toDataURL("image/jpeg",0.75));};img.onerror=()=>{URL.revokeObjectURL(url);const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);};img.src=url;});}
-async function cup(f){return await uploadImage(await compressImage(f));}
+function readAsBase64(file){return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});}
+async function cup(f){return await uploadImage(await readAsBase64(f));}
 function useImg(cb){const r=useRef(null);const[u,sU]=useState(false);const el=<input ref={r} type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;sU(true);try{cb(await cup(f));}catch(e){}sU(false);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el,uploading:u};}
 function useBulkImg(onRes){const r=useRef(null);const[u,sU]=useState(false);const el=<input ref={r} type="file" accept="image/*" multiple onChange={async e=>{const files=[...e.target.files||[]];if(!files.length)return;sU(true);const res=[];for(const f of files){try{res.push({label:fileToLabel(f.name),image:await cup(f)});}catch(e){}}onRes(res);sU(false);e.target.value="";}} style={{display:"none"}}/>;return{go:()=>r.current?.click(),el,uploading:u};}
 
@@ -87,25 +99,236 @@ function MoveButtons({index,total,onMove}){return<div style={{display:"flex",fle
 function QRCode({url,size=160}){return<img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&margin=8`} alt="QR" style={{width:size,height:size,borderRadius:8,display:"block"}}/>;}
 function Toggle({on,onToggle,label,accent}){const a=accent||"#C4956A";return<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:"10px 12px",background:"#fff",borderRadius:8,border:"1px solid #EDEAE6"}}><span style={{fontSize:12,color:"#6B6560",flex:1}}>{label}</span><button onClick={onToggle} style={{width:44,height:24,borderRadius:12,border:"none",background:on?a:"#D5D0CA",cursor:"pointer",position:"relative"}}><div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:on?22:2,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></button></div>;}
 
+/* ━━━ A3 PDF出力（複数ページ対応） ━━━ */
+const A3W=1587,A3H=1123;
+const PG=({id,children})=><div id={id} style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:"#fff",overflow:"hidden",display:"flex",flexDirection:"column"}}/>;
+
+/* ヘッダー共通 */
+function PdfHdr({data,sub}){const th=T(data);const a=th.accent;const d=th.dark;
+  return<div style={{display:"flex",alignItems:"center",padding:"18px 36px",background:d,color:"#fff",flexShrink:0}}>
+    <div style={{flex:1}}>
+      <div style={{fontSize:9,letterSpacing:6,color:`${a}99`,textTransform:"uppercase"}}>KITA HOUSING — PROPOSAL</div>
+      <div style={{fontSize:20,fontWeight:300,letterSpacing:4,marginTop:3}}>{data.customerName?`${data.customerName} 様邸`:"提案書"}</div>
+    </div>
+    <div style={{textAlign:"right"}}>
+      <div style={{fontSize:13,fontWeight:300,letterSpacing:3,color:"rgba(255,255,255,0.8)"}}>{data.planTitle}{sub?` — ${sub}`:""}</div>
+      {data.staffName&&<div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:3}}>担当：{data.staffName}</div>}
+    </div>
+  </div>;
+}
+/* フッター共通 */
+function PdfFtr({data,pageNum,totalPages}){const th=T(data);const a=th.accent;const d=th.dark;
+  return<div style={{display:"flex",padding:"10px 36px 14px",background:th.secBg,borderTop:`1px solid ${th.tagBorder}`,flexShrink:0,alignItems:"center"}}>
+    <div style={{flex:1,display:"flex",alignItems:"center",gap:16}}>
+      <div style={{fontSize:13,fontWeight:300,color:d,letterSpacing:2}}>{data.contact.phone}</div>
+      <div style={{fontSize:7.5,color:"#A09890"}}>{data.contact.hours}</div>
+      <div style={{fontSize:7.5,color:"#A09890"}}>喜多ハウジング株式会社　{data.contact.address}</div>
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:12}}>
+      <div style={{fontSize:8,color:"#A09890"}}>{pageNum} / {totalPages}</div>
+      <div style={{width:20,height:1.5,background:a,borderRadius:1}}/>
+      <div style={{fontSize:6.5,color:"#CCC5BE",letterSpacing:2}}>© 2026 KITA HOUSING</div>
+    </div>
+  </div>;
+}
+
+/* P1: コンセプト + 図面 + 外観 + 仕様 + 資金計画 */
+function PdfPage1({data,totalPages}){
+  const th=T(data);const a=th.accent;const d=th.dark;
+  const ev=data.exterior.views.filter(v=>v.image);
+  const specs=data.specs.filter(s=>s.category&&s.value);
+  const pItems=data.pricing?.items?.filter(p=>p.label)||[];
+  const ba=(data.beforeAfter?.pairs||[]).filter(p=>p.after);
+  const floors=data.plan.floors.filter(f=>f.image);
+  return<div id="pdf-p1" style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:"#fff",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <PdfHdr data={data}/>
+    <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+      {/* 左: コンセプト+仕様 */}
+      <div style={{width:"28%",padding:"24px 24px 16px 36px",display:"flex",flexDirection:"column",borderRight:`1px solid ${th.tagBorder}`,overflow:"hidden"}}>
+        {data.coverImage&&<div style={{width:"100%",height:150,borderRadius:8,overflow:"hidden",marginBottom:16,flexShrink:0}}>
+          <img src={data.coverImage} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        </div>}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:8}}>CONCEPT</div>
+          <div style={{fontSize:15,fontWeight:300,color:d,lineHeight:1.9,whiteSpace:"pre-line",marginBottom:10}}>{data.concept.headline}</div>
+          <div style={{fontSize:9,lineHeight:2.1,color:"#6B6560"}}>{data.concept.body}</div>
+        </div>
+        {data.concept.tags.filter(Boolean).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>
+          {data.concept.tags.filter(Boolean).map((t,i)=><span key={i} style={{padding:"4px 10px",border:`1px solid ${th.tagBorder}`,borderRadius:4,fontSize:8,color:"#6B6560",letterSpacing:1}}>{t}</span>)}
+        </div>}
+        <div style={{width:"100%",height:1,background:th.tagBorder,margin:"4px 0 12px"}}/>
+        <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:8}}>SPECIFICATIONS</div>
+        <div style={{flex:1,overflow:"hidden"}}>
+          {specs.map((s,i)=><div key={i} style={{display:"flex",padding:"5px 0",borderBottom:`1px solid ${th.tagBorder}`,gap:8}}>
+            <span style={{fontSize:8.5,color:"#A09890",fontWeight:500,letterSpacing:1,minWidth:48,flexShrink:0}}>{s.category}</span>
+            <span style={{fontSize:9,color:d,lineHeight:1.6}}>{s.value}</span>
+          </div>)}
+        </div>
+      </div>
+
+      {/* 中: 間取り */}
+      <div style={{width:"30%",padding:"24px 20px",display:"flex",flexDirection:"column",borderRight:`1px solid ${th.tagBorder}`,overflow:"hidden"}}>
+        <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:6}}>PLAN</div>
+        {data.plan.area&&<div style={{fontSize:9,color:"#A09890",marginBottom:12}}>延床面積 {data.plan.area}㎡（{data.plan.tsubo}坪）</div>}
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:10,overflow:"hidden"}}>
+          {floors.length>0?floors.map((fl,i)=><div key={i} style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
+            <div style={{fontSize:10,fontWeight:600,color:d,marginBottom:5,display:"flex",alignItems:"center",gap:6}}>
+              <span style={{background:d,color:"#fff",fontSize:8,padding:"2px 8px",borderRadius:3}}>{fl.label}</span>
+            </div>
+            <div style={{flex:1,borderRadius:8,overflow:"hidden",minHeight:0}}>
+              <img src={fl.image} alt="" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
+            </div>
+          </div>):<div style={{flex:1,background:th.accentLight,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#A09890",fontSize:11}}>間取り画像なし</span></div>}
+        </div>
+      </div>
+
+      {/* 右: 外観 + B/A + 資金計画 */}
+      <div style={{width:"42%",padding:"24px 36px 16px 20px",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {ev.length>0&&<div style={{marginBottom:14}}>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:8}}>EXTERIOR</div>
+          {ev.length===1?<div style={{borderRadius:10,overflow:"hidden",maxHeight:380}}><img src={ev[0].image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          </div>:<div style={{display:"grid",gridTemplateColumns:ev.length===2?"1fr 1fr":`repeat(${Math.min(ev.length,3)}, 1fr)`,gap:8}}>
+            {ev.slice(0,6).map((v,i)=><div key={i} style={{borderRadius:8,overflow:"hidden",aspectRatio:"16/10",position:"relative"}}>
+              <img src={v.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              {v.label&&<div style={{position:"absolute",bottom:0,left:0,right:0,padding:"14px 8px 5px",background:"linear-gradient(transparent, rgba(0,0,0,0.6))"}}><div style={{fontSize:8,color:"#fff",letterSpacing:1}}>{v.label}</div></div>}
+            </div>)}
+          </div>}
+        </div>}
+        {/* B/A */}
+        {ba.length>0&&<div style={{marginBottom:14}}>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:8}}>BEFORE / AFTER</div>
+          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(ba.length,3)}, 1fr)`,gap:8}}>
+            {ba.slice(0,3).map((p,i)=><div key={i} style={{display:"flex",gap:4}}>
+              <div style={{flex:1,borderRadius:6,overflow:"hidden",aspectRatio:"4/3",position:"relative"}}>
+                <img src={p.before} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                <div style={{position:"absolute",top:4,left:4,background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"2px 6px",fontSize:6.5,color:"#fff",letterSpacing:1}}>BEFORE</div>
+              </div>
+              <div style={{flex:1,borderRadius:6,overflow:"hidden",aspectRatio:"4/3",position:"relative"}}>
+                <img src={p.after} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                <div style={{position:"absolute",top:4,left:4,background:`${a}CC`,borderRadius:3,padding:"2px 6px",fontSize:6.5,color:"#fff",letterSpacing:1}}>AFTER</div>
+              </div>
+            </div>)}
+          </div>
+        </div>}
+        {/* 資金計画 */}
+        {data.pricing?.show!==false&&pItems.length>0&&<div style={{marginTop:"auto"}}>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:8}}>PRICE</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 24px"}}>
+            {pItems.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:`1px solid ${th.tagBorder}`}}>
+              <span style={{fontSize:9,color:"#6B6560"}}>{it.label}</span>
+              <span style={{fontSize:10,color:d,fontWeight:500}}>{it.amount||"—"}</span>
+            </div>)}
+          </div>
+          {data.pricing.total&&<div style={{marginTop:6,padding:"8px 0",borderTop:`2px solid ${d}`,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+            <span style={{fontSize:10,color:d,fontWeight:600,letterSpacing:2}}>合計（税込）</span>
+            <span style={{fontSize:18,color:d,fontWeight:300}}>{data.pricing.total}</span>
+          </div>}
+          {data.pricing.notes&&<div style={{fontSize:7.5,color:"#A09890",marginTop:4}}>※ {data.pricing.notes}</div>}
+        </div>}
+        {ev.length===0&&ba.length===0&&!(data.pricing?.show!==false&&pItems.length>0)&&
+          <div style={{flex:1,background:th.accentLight,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#A09890",fontSize:11}}>外観画像なし</span></div>}
+      </div>
+    </div>
+    <PdfFtr data={data} pageNum={1} totalPages={totalPages}/>
+  </div>;
+}
+
+/* 内装ページ（4枚/ページ、2×2グリッド） */
+function PdfPageInt({data,views,pageIdx,pageNum,totalPages}){
+  const th=T(data);const a=th.accent;const d=th.dark;
+  return<div id={`pdf-int-${pageIdx}`} style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:"#fff",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <PdfHdr data={data} sub="INTERIOR"/>
+    <div style={{flex:1,padding:"24px 36px",display:"flex",flexDirection:"column",overflow:"hidden",background:th.darkBg}}>
+      <div style={{fontSize:9,letterSpacing:5,color:`${a}99`,textTransform:"uppercase",marginBottom:14,flexShrink:0}}>INTERIOR DESIGN　—　{pageIdx+1}</div>
+      <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:14,overflow:"hidden"}}>
+        {views.map((v,i)=><div key={i} style={{borderRadius:10,overflow:"hidden",position:"relative",minHeight:0}}>
+          <img src={v.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"28px 16px 12px",background:"linear-gradient(transparent, rgba(0,0,0,0.7))"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+              <div>
+                <div style={{fontSize:13,color:"#fff",fontWeight:400,letterSpacing:2}}>{v.label||"無題"}</div>
+                {v.tag&&<div style={{fontSize:8,color:`${a}CC`,letterSpacing:1,marginTop:3}}>{v.tag}</div>}
+              </div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.35)"}}>{pageIdx*4+i+1}</div>
+            </div>
+          </div>
+        </div>)}
+        {/* 4枚未満の場合は空セルを埋める */}
+        {Array.from({length:4-views.length}).map((_,i)=><div key={`e${i}`} style={{borderRadius:10,background:`${th.dark}40`,display:"flex",alignItems:"center",justifyContent:"center"}}/>)}
+      </div>
+    </div>
+    <PdfFtr data={data} pageNum={pageNum} totalPages={totalPages}/>
+  </div>;
+}
+
+function PdfLayout({data}){
+  const iv=data.interior.views.filter(v=>v.image);
+  const intPages=[];for(let i=0;i<iv.length;i+=4)intPages.push(iv.slice(i,i+4));
+  const totalPages=1+(intPages.length||0);
+  return<div style={{position:"fixed",left:-9999,top:0,zIndex:-1}}>
+    <PdfPage1 data={data} totalPages={totalPages}/>
+    {intPages.map((chunk,pi)=><PdfPageInt key={pi} data={data} views={chunk} pageIdx={pi} pageNum={pi+2} totalPages={totalPages}/>)}
+  </div>;
+}
+
+async function exportA3Pdf(data){
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;";
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)"><div style="font-size:14px;color:#2C2420;font-weight:500;margin-bottom:8px">PDF生成中...</div><div id="pdf-progress" style="font-size:11px;color:#A09890">ページを準備しています...</div></div>';
+  document.body.appendChild(ov);
+  const prog=document.getElementById("pdf-progress");
+
+  const iv=data.interior.views.filter(v=>v.image);
+  const intPageCount=Math.ceil(iv.length/4);
+  const totalPages=1+intPageCount;
+  const pageIds=["pdf-p1",...Array.from({length:intPageCount},(_,i)=>`pdf-int-${i}`)];
+
+  // show all pages for rendering
+  const container=document.querySelector('[style*="left: -9999px"]')||document.querySelector('div[style]');
+  const pdfRoot=document.getElementById("pdf-p1")?.parentElement;
+  if(!pdfRoot){document.body.removeChild(ov);return;}
+  pdfRoot.style.left="0";pdfRoot.style.top="0";pdfRoot.style.zIndex="99999";
+  await new Promise(r=>setTimeout(r,200));
+
+  try{
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a3"});
+
+    for(let i=0;i<pageIds.length;i++){
+      const el=document.getElementById(pageIds[i]);
+      if(!el)continue;
+      if(prog)prog.textContent=`ページ ${i+1} / ${totalPages} を描画中...`;
+      const canvas=await html2canvas(el,{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false,width:A3W,height:A3H});
+      const imgData=canvas.toDataURL("image/jpeg",0.92);
+      if(i>0)pdf.addPage("a3","landscape");
+      pdf.addImage(imgData,"JPEG",0,0,420,297);
+    }
+    const name=data.customerName?`${data.customerName}様_提案書`:"提案書";
+    pdf.save(`${name}.pdf`);
+  }catch(e){console.error("PDF export error:",e);alert("PDF出力に失敗しました: "+e.message);}
+  finally{pdfRoot.style.left="-9999px";pdfRoot.style.zIndex="-1";document.body.removeChild(ov);}
+}
+
 /* ━━━ App ━━━ */
 function App(){
   const[mode,setMode]=useState("loading");const[data,setData]=useState(DEFAULT);const[tab,setTab]=useState("basic");const[lb,setLb]=useState(null);const[shareId,setShareId]=useState(null);const[err,setErr]=useState(null);const prevRef=useRef("edit");
   useEffect(()=>{const hash=location.hash.replace("#","");const p=new URLSearchParams(location.search);
     if(hash&&hash.length>=4&&p.get("v")==="1"){loadP(hash).then(r=>{if(r?.data){setData(r.data);setMode("customer");}else setMode("login");}).catch(()=>setMode("login"));return;}
-    if(getKey()){if(hash&&hash.length>=4){loadP(hash).then(r=>{if(r?.data){setData(r.data);setShareId(hash);}setMode("edit");}).catch(()=>setMode("edit"));}else setMode("edit");}else setMode("login");
+    if(getKey()){if(hash&&hash.length>=4){loadPAuth(hash).then(r=>{if(r?.data){setData(r.data);setShareId(hash);}setMode("edit");}).catch(()=>setMode("edit"));}else setMode("edit");}else setMode("login");
   },[]);
   const hLogin=async k=>{setKey(k);try{await listP();setMode("edit");}catch(e){setKey("");throw e;}};
-  const hSave=async()=>{const id=shareId||genId();try{await saveP(id,data);setShareId(id);return id;}catch(e){setErr(e.message);return null;}};
-  const hLoad=async id=>{try{const r=await loadP(id);if(r?.data){setData(r.data);setShareId(id);setMode("edit");}}catch(e){setErr(e.message);}};
+  const hSave=async()=>{const id=shareId||genId();try{const now=new Date().toISOString();const d2={...data,dataType:"decided",updatedAt:now,expiresAt:calcExpiry(now)};setData(d2);await saveP(id,d2);setShareId(id);return id;}catch(e){setErr(e.message);return null;}};
+  const hLoad=async id=>{try{const r=await loadPAuth(id);if(r?.data){setData(r.data);setShareId(id);setMode("edit");}else{alert("データの読み込みに失敗しました");}}catch(e){alert("読み込みエラー: "+e.message);}};
   if(mode==="loading")return<Sh full><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{color:"#A09890",fontSize:13}}>読み込み中...</p></div></Sh>;
   if(mode==="login")return<Login onDone={hLogin}/>;
   if(mode==="walkthrough")return<WT url={data.viewer3dUrl} onClose={()=>setMode(prevRef.current)}/>;
   return<>
     {mode==="customer"&&<Sh full><CV data={data} onWt={()=>{prevRef.current="customer";setMode("walkthrough");}} onZoom={setLb}/></Sh>}
-    {mode==="preview"&&<Sh full><PV data={data} onBack={()=>setMode("edit")} onWt={()=>{prevRef.current="preview";setMode("walkthrough");}} onZoom={setLb}/></Sh>}
-    {mode==="edit"&&<EdWrap data={data} setData={setData} tab={tab} setTab={setTab} onPv={()=>setMode("preview")} sid={shareId} onSave={hSave} onLoad={hLoad} onNew={()=>{setData(DEFAULT);setShareId(null);setTab("basic");}} onList={()=>setMode("list")} err={err} setErr={setErr} onLogout={()=>{setKey("");setMode("login");}}/>}
+    {mode==="preview"&&<div style={{width:"100%",height:"100%",position:"relative"}}><div className="no-print" style={{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:100,display:"flex",gap:8}}><button onClick={()=>setMode("edit")} style={{background:"rgba(44,36,32,0.85)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer"}}>◀ 編集</button><button onClick={()=>exportA3Pdf(data)} style={{background:"rgba(196,149,106,0.9)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>A3 PDF</button></div><div style={S.sc}><Pres data={data} sy={0} onWt={()=>{prevRef.current="preview";setMode("walkthrough");}} onZoom={setLb}/></div></div>}
+    {mode==="edit"&&<EdWrap data={data} setData={setData} tab={tab} setTab={setTab} onPv={()=>setMode("preview")} sid={shareId} onSave={hSave} onLoad={hLoad} onNew={()=>{setData(JSON.parse(JSON.stringify(DEFAULT)));setShareId(null);setTab("basic");}} onList={()=>setMode("list")} err={err} setErr={setErr} onLogout={()=>{setKey("");setMode("login");}}/>}
     {mode==="list"&&<LSWrap onLoad={hLoad} onBack={()=>setMode("edit")}/>}
     {lb&&mode!=="walkthrough"&&<LightBox {...lb} onClose={()=>setLb(null)} onChange={setLb}/>}
+    <PdfLayout data={data}/>
   </>;
 }
 function Login({onDone}){const[k,setK]=useState("");const[t,setT]=useState(false);const[e,setE]=useState(null);
@@ -118,47 +341,32 @@ function Login({onDone}){const[k,setK]=useState("");const[t,setT]=useState(false
 /* ━━━ Editor（サイドバー + 1カラム） ━━━ */
 const TABS=[{id:"basic",l:"基本"},{id:"concept",l:"コンセプト"},{id:"plan",l:"間取り"},{id:"exterior",l:"外観"},{id:"interior",l:"内装"},{id:"ba",l:"B/A"},{id:"3d",l:"3D"},{id:"spec",l:"仕様"},{id:"price",l:"価格"},{id:"contact",l:"連絡先"}];
 
-function EdWrap(props){const th=T(props.data);return<div style={{width:"100%",height:"100%",display:"flex",background:th.accentLight}}>{/* Sidebar */}<div style={{width:180,flexShrink:0,background:"#fff",borderRight:"1px solid #EDEAE6",display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-  <div style={{padding:"16px 16px 12px"}}><div style={{fontSize:9,letterSpacing:4,color:th.accent}}>KITA HOUSING</div><div style={{fontSize:13,fontWeight:600,color:th.dark,marginTop:4}}>提案書作成</div><div style={{width:20,height:1.5,background:th.accent,marginTop:8,borderRadius:1}}/></div>
-  <div style={{flex:1,overflowY:"auto",padding:"4px 8px"}}>{TABS.map(t=><button key={t.id} onClick={()=>props.setTab(t.id)} style={{width:"100%",padding:"10px 12px",border:"none",borderRadius:8,marginBottom:2,textAlign:"left",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,background:props.tab===t.id?th.accentLight:"transparent",color:props.tab===t.id?th.dark:"#8B8580",fontWeight:props.tab===t.id?600:400,transition:"all .15s",borderLeft:props.tab===t.id?`3px solid ${th.accent}`:"3px solid transparent"}}>{t.l}</button>)}</div>
-  <div style={{padding:12,borderTop:"1px solid #EDEAE6",display:"flex",flexDirection:"column",gap:6}}>
-    <div style={{display:"flex",gap:4}}><button onClick={props.onNew} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>新規</button><button onClick={props.onList} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>一覧</button></div>
-    <div style={{display:"flex",gap:4}}><button onClick={async()=>{const id=await props.onSave();if(id)props._setShowSh?.(true);}} style={{...S.smB,background:th.accent,color:"#fff",flex:1,textAlign:"center"}}>保存</button><button onClick={props.onPv} style={{...S.smB,background:th.dark,color:"#fff",flex:1,textAlign:"center"}}>▶ プレビュー</button></div>
-    <button onClick={props.onLogout} style={{background:"none",border:"none",color:"#A09890",fontSize:10,cursor:"pointer",padding:"6px 0"}}>ログアウト</button>
-  </div>
-</div>{/* Content */}<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}><Ed {...props}/></div></div>;}
-
-function Ed({data,setData,tab,onSave,sid:shareId,err,setErr}){
-  const th=T(data);const u=(p,v)=>up(setData,p,v);const[saving,setSaving]=useState(false);const[showSh,setShowSh]=useState(false);const[sid,setSid]=useState(shareId);const[showQr,setShowQr]=useState(false);
-  useEffect(()=>{setSid(shareId);},[shareId]);
-  const doSave=async()=>{setSaving(true);const id=await onSave();if(id){setSid(id);setShowSh(true);}setSaving(false);};
-  const shareUrl=sid?`${location.origin}${location.pathname}?v=1#${sid}`:"";
-  return<>
-    {sid&&<div style={{padding:"10px 20px",background:"#fff",borderBottom:"1px solid #EDEAE6",display:"flex",alignItems:"center",gap:10,flexShrink:0}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:9,color:th.accent,letterSpacing:1,fontWeight:500}}>共有URL</div><div style={{fontSize:11,color:"#6B6560",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{shareUrl}</div></div><button onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);}catch(e){}}} style={{...S.smB,background:th.dark,color:"#fff",fontSize:10,padding:"5px 12px"}}>コピー</button><button onClick={()=>setShowQr(!showQr)} style={{...S.smB,background:"#fff",color:th.dark,fontSize:10,padding:"5px 12px",border:`1px solid ${th.tagBorder}`}}>QR</button></div>}
-    {showQr&&sid&&<div style={{padding:16,background:"#fff",borderBottom:"1px solid #EDEAE6",display:"flex",flexDirection:"column",alignItems:"center",gap:8,flexShrink:0}}><QRCode url={shareUrl} size={180}/></div>}
-    {showSh&&sid&&<ShMdl url={shareUrl} id={sid} onClose={()=>setShowSh(false)} th={th}/>}
-    {err&&<div style={{padding:"10px 20px",background:"#FFF0F0",fontSize:11,color:"#C44",display:"flex",justifyContent:"space-between",flexShrink:0}}><span>{err}</span><button onClick={()=>setErr(null)} style={{background:"none",border:"none",color:"#C44",cursor:"pointer"}}>✕</button></div>}
-    <div style={{flex:1,overflowY:"auto",padding:"24px 28px 40px"}}>
-      <div style={{maxWidth:600}}>
-        {tab==="basic"&&<EBas d={data} u={u}/>}{tab==="concept"&&<ECon d={data} u={u}/>}{tab==="plan"&&<EPla d={data} u={u}/>}{tab==="exterior"&&<EExt d={data} u={u} th={th}/>}{tab==="interior"&&<EInt d={data} u={u} th={th}/>}{tab==="ba"&&<EBA d={data} u={u} th={th}/>}{tab==="3d"&&<FS t="3Dウォークスルー"><Fi l="URL" v={data.viewer3dUrl} s={v=>u("viewer3dUrl",v)} p="https://..."/></FS>}{tab==="spec"&&<ESpe d={data} u={u}/>}{tab==="price"&&<EPri d={data} u={u} th={th}/>}{tab==="contact"&&<ECon2 d={data} u={u}/>}
-      </div>
-    </div>
-  </>;
-}
-function ShMdl({url,id,onClose,th}){const[cp,setCp]=useState(false);const a=th?.accent||"#C4956A";const d=th?.dark||"#2C2420";
-  return<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
-    <div style={{fontSize:16,fontWeight:600,color:d,marginBottom:16}}>保存しました</div>
-    <div style={{display:"flex",justifyContent:"center",marginBottom:16}}><QRCode url={url} size={180}/></div>
-    <div style={{background:th?.accentLight||"#F5F3F0",borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:16,fontWeight:600,color:d,letterSpacing:3,fontFamily:"monospace",wordBreak:"break-all"}}>{id}</div></div>
-    <div style={{background:th?.accentLight||"#F5F3F0",borderRadius:8,padding:"10px 12px",marginBottom:16,wordBreak:"break-all",fontSize:10,color:"#6B6560",fontFamily:"monospace"}}>{url}</div>
-    <div style={{display:"flex",gap:8}}><button onClick={async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}}} style={{flex:1,padding:"12px 0",background:d,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer"}}>{cp?"✓ コピー済み":"URLをコピー"}</button><button onClick={onClose} style={{padding:"12px 18px",background:th?.accentLight||"#F0EDE8",color:d,border:"none",borderRadius:8,fontSize:12,cursor:"pointer"}}>閉じる</button></div>
-  </div></div>;}
-function LSWrap({onLoad,onBack}){return<div style={{width:"100%",height:"100%",background:"#FAF8F5",display:"flex",flexDirection:"column"}}><LS onLoad={onLoad} onBack={onBack}/></div>;}
-function LS({onLoad,onBack}){const[list,setList]=useState([]);const[ld,setLd]=useState(true);
-  useEffect(()=>{listP().then(r=>{setList(r||[]);setLd(false);}).catch(()=>setLd(false));},[]);
-  return<><div style={S.eH}><button onClick={onBack} style={{background:"none",border:"none",color:"#2C2420",fontSize:13,cursor:"pointer"}}>◀ 戻る</button><div style={{fontSize:14,fontWeight:600,color:"#2C2420"}}>保存済み提案書</div><div style={{width:48}}/></div>
-    <div style={{flex:1,overflowY:"auto",padding:20}}>{ld&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>読み込み中...</div>}{!ld&&list.length===0&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>提案書はありません</div>}{list.map(it=><div key={it.id} style={{padding:16,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",marginBottom:10,display:"flex",alignItems:"center",gap:12,maxWidth:600}}><div style={{flex:1}}><div style={{fontSize:14,color:"#2C2420",fontWeight:500}}>{it.customerName||"未設定"} 様</div><div style={{fontSize:11,color:"#A09890",marginTop:3}}>{it.planTitle} <span style={{fontFamily:"monospace",fontSize:10}}>#{it.id}</span></div></div><button onClick={()=>onLoad(it.id)} style={{background:"#2C2420",color:"#fff",border:"none",borderRadius:6,padding:"8px 14px",fontSize:11,cursor:"pointer"}}>開く</button><button onClick={async()=>{if(confirm("削除?")){await delP(it.id).catch(()=>{});setList(l=>l.filter(x=>x.id!==it.id));}}} style={{background:"none",border:"none",color:"#CCC5BE",fontSize:16,cursor:"pointer"}}>✕</button></div>)}</div></>;
-}
+function EdWrap(props){const th=T(props.data);const[showSh,setShowSh]=useState(false);const[sid,setSid]=useState(props.sid);useEffect(()=>{setSid(props.sid);},[props.sid]);const shareUrl=sid?`${location.origin}${location.pathname}?v=1#${sid}`:"";const u=(p,v)=>up(props.setData,p,v);
+  return<div style={{width:"100%",height:"100%",display:"flex",background:th.accentLight}}>
+    <div style={{width:190,flexShrink:0,background:"#fff",borderRight:"1px solid #EDEAE6",display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}><div style={{padding:"16px 16px 12px"}}><div style={{fontSize:9,letterSpacing:4,color:th.accent}}>KITA HOUSING</div><div style={{fontSize:13,fontWeight:600,color:th.dark,marginTop:4}}>ご契約 提案書</div><div style={{width:20,height:1.5,background:th.accent,marginTop:8,borderRadius:1}}/></div>
+      <div style={{flex:1,overflowY:"auto",padding:"4px 8px"}}>{TABS.map(t=><button key={t.id} onClick={()=>props.setTab(t.id)} style={{width:"100%",padding:"10px 12px",border:"none",borderRadius:8,marginBottom:2,textAlign:"left",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,background:props.tab===t.id?th.accentLight:"transparent",color:props.tab===t.id?th.dark:"#8B8580",fontWeight:props.tab===t.id?600:400,borderLeft:props.tab===t.id?`3px solid ${th.accent}`:"3px solid transparent"}}>{t.l}</button>)}</div>
+      <div style={{padding:12,borderTop:"1px solid #EDEAE6",display:"flex",flexDirection:"column",gap:6}}><div style={{display:"flex",gap:4}}><button onClick={props.onNew} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>新規</button><button onClick={props.onList} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>一覧</button></div><div style={{display:"flex",gap:4}}><button onClick={async()=>{const id=await props.onSave();if(id){setSid(id);setShowSh(true);}}} style={{...S.smB,background:th.accent,color:"#fff",flex:1,textAlign:"center"}}>保存</button><button onClick={props.onPv} style={{...S.smB,background:th.dark,color:"#fff",flex:1,textAlign:"center"}}>▶ プレビュー</button></div><button onClick={()=>exportA3Pdf(props.data)} style={{width:"100%",padding:"7px 0",border:`1px solid ${th.tagBorder}`,borderRadius:6,background:"#fff",fontSize:11,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,color:th.dark,letterSpacing:1}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={th.accent} strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>A3 PDF出力</button><button onClick={props.onLogout} style={{background:"none",border:"none",color:"#A09890",fontSize:10,cursor:"pointer",padding:"6px 0"}}>ログアウト</button></div></div>
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>{sid&&<div style={{padding:"10px 20px",background:"#fff",borderBottom:"1px solid #EDEAE6",display:"flex",alignItems:"center",gap:10,flexShrink:0}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:9,color:th.accent,letterSpacing:1,fontWeight:500}}>共有URL</div><div style={{fontSize:11,color:"#6B6560",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{shareUrl}</div></div><button onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);}catch(e){}}} style={{...S.smB,background:th.dark,color:"#fff",fontSize:10,padding:"5px 12px"}}>コピー</button></div>}
+      {showSh&&sid&&<ShareModal url={shareUrl} id={sid} onClose={()=>setShowSh(false)} th={th}/>}
+      {props.err&&<div style={{padding:"10px 20px",background:"#FFF0F0",fontSize:11,color:"#C44",display:"flex",justifyContent:"space-between",flexShrink:0}}><span>{props.err}</span><button onClick={()=>props.setErr(null)} style={{background:"none",border:"none",color:"#C44",cursor:"pointer"}}>✕</button></div>}
+      <div style={{flex:1,overflowY:"auto",padding:"24px 28px 40px"}}><div style={{maxWidth:640}}>
+        {props.tab==="basic"&&<EBas d={props.data} u={u}/>}{props.tab==="concept"&&<ECon d={props.data} u={u}/>}{props.tab==="plan"&&<EPla d={props.data} u={u}/>}{props.tab==="exterior"&&<EExt d={props.data} u={u} th={th}/>}{props.tab==="interior"&&<EInt d={props.data} u={u} th={th}/>}{props.tab==="ba"&&<EBA d={props.data} u={u} th={th}/>}{props.tab==="3d"&&<FS t="3Dウォークスルー"><Fi l="URL" v={props.data.viewer3dUrl} s={v=>u("viewer3dUrl",v)} p="https://..."/></FS>}{props.tab==="spec"&&<ESpe d={props.data} u={u}/>}{props.tab==="price"&&<EPri d={props.data} u={u} th={th}/>}{props.tab==="contact"&&<ECon2 d={props.data} u={u}/>}
+      </div></div></div></div>;}
+function ShareModal({url,id,onClose,th}){const[cp,setCp]=useState(false);return<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}><div style={{fontSize:16,fontWeight:600,marginBottom:16}}>保存しました</div><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><QRCode url={url} size={180}/></div><div style={{background:th.accentLight,borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:16,fontWeight:600,letterSpacing:3,fontFamily:"monospace"}}>{id}</div></div><div style={{background:th.accentLight,borderRadius:8,padding:"10px 12px",marginBottom:16,wordBreak:"break-all",fontSize:10,color:"#6B6560",fontFamily:"monospace"}}>{url}</div><div style={{display:"flex",gap:8}}><button onClick={async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}}} style={{flex:1,padding:"12px 0",background:th.dark,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer"}}>{cp?"✓ コピー済み":"URLをコピー"}</button><button onClick={onClose} style={{padding:"12px 18px",background:th.accentLight,color:th.dark,border:"none",borderRadius:8,fontSize:12,cursor:"pointer"}}>閉じる</button></div></div></div>;}
+function LSWrap({onLoad,onBack}){const[list,setList]=useState([]);const[ld,setLd]=useState(true);const[q,setQ]=useState("");const[sort,setSort]=useState("date-desc");const impRef=useRef(null);
+  useEffect(()=>{listP().then(r=>{const items=(r||[]).filter(it=>it.id.startsWith(ID_PREFIX));setList(items);setLd(false);
+    /* background: load details for dates + auto-delete expired */
+    const now=new Date().toISOString();
+    Promise.all(items.map(async it=>{try{const full=await loadPAuth(it.id);const d=full?.data;const exp=d?.expiresAt||calcExpiry(d?.updatedAt);if(exp&&exp<now){try{await delWithImages(it.id,d);}catch(e){}return null;}return{...it,updatedAt:d?.updatedAt,expiresAt:exp,_data:d};}catch(e){return it;}})).then(res=>{setList(res.filter(Boolean));});
+  }).catch(()=>setLd(false));},[]);
+  const filtered=useMemo(()=>{let f=list;if(q){const lq=q.toLowerCase();f=f.filter(i=>(i.customerName||"").toLowerCase().includes(lq)||(i.planTitle||"").toLowerCase().includes(lq)||(i.id||"").toLowerCase().includes(lq));}f=[...f];if(sort==="date-desc")f.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));else if(sort==="date-asc")f.sort((a,b)=>(a.updatedAt||"").localeCompare(b.updatedAt||""));else if(sort==="name")f.sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));return f;},[list,q,sort]);
+  const handleExport=async it=>{let d=it._data;if(!d){try{const full=await loadPAuth(it.id);d=full?.data;}catch(e){alert("データ取得失敗");return;}}const blob=new Blob([JSON.stringify({id:it.id,data:d},null,2)],{type:"application/json"});const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=`${it.customerName||"export"}_${it.id}.json`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);};
+  const handleImport=async file=>{try{const text=await file.text();const json=JSON.parse(text);const d=json.data||json;const id=genId();const now=new Date().toISOString();d.dataType="decided";d.updatedAt=now;d.expiresAt=calcExpiry(now);await saveP(id,d);onLoad(id);}catch(e){alert("インポート失敗: "+e.message);}};
+  const handleDelete=async id=>{if(!confirm("この物件を削除しますか？\n関連画像もすべて削除されます。"))return;const it=list.find(x=>x.id===id);let d=it?._data;if(!d){try{const full=await loadPAuth(id);d=full?.data;}catch(e){}}try{await delWithImages(id,d);}catch(e){try{await delP(id);}catch(e2){}}setList(l=>l.filter(x=>x.id!==id));};
+  return<div style={{width:"100%",height:"100%",background:"#FAF8F5",display:"flex",flexDirection:"column"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid #EDEAE6",background:"#fff",flexShrink:0}}><button onClick={onBack} style={{background:"none",border:"none",fontSize:13,cursor:"pointer"}}>◀ 戻る</button><div style={{fontSize:14,fontWeight:600}}>物件一覧</div><div style={{width:48}}/></div>
+    <div style={{padding:"12px 16px",background:"#fff",borderBottom:"1px solid #EDEAE6",flexShrink:0}}>
+      <div style={{display:"flex",gap:8}}><div style={{flex:1,position:"relative"}}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="検索（名前・タイトル・ID）" style={{...S.inp,paddingLeft:32,fontSize:12}}/><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09890" strokeWidth="2" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)"}}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><select value={sort} onChange={e=>setSort(e.target.value)} style={{...S.inp,width:130,fontSize:11,padding:"8px 10px"}}><option value="date-desc">更新日↓新しい</option><option value="date-asc">更新日↑古い</option><option value="name">名前順</option></select><button onClick={()=>impRef.current?.click()} style={{...S.smB,background:"#2C2420",color:"#fff",flexShrink:0,fontSize:10,padding:"8px 12px"}}>インポート</button><input ref={impRef} type="file" accept=".json" onChange={e=>{const f=e.target.files?.[0];if(f)handleImport(f);e.target.value="";}} style={{display:"none"}}/></div></div>
+    <div style={{flex:1,overflowY:"auto",padding:16}}>{ld&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>読み込み中...</div>}{!ld&&filtered.length===0&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>{q?"該当なし":"データなし"}</div>}{filtered.map(it=>{const rd=remainDays(it.expiresAt);return<div key={it.id} style={{padding:14,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",marginBottom:8,display:"flex",alignItems:"center",gap:12,maxWidth:700}}><div style={{width:4,height:40,borderRadius:2,background:"#6B8F71",flexShrink:0}}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,fontWeight:500}}>{it.customerName||"未設定"} 様</span></div><div style={{fontSize:11,color:"#A09890",marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}><span>{it.planTitle}</span><span style={{fontFamily:"monospace",fontSize:10}}>#{it.id}</span><span style={{fontSize:10,color:"#B5AFA8"}}>{fmtDate(it.updatedAt)}</span>{rd!=null&&<span style={{fontSize:9,color:rd<30?"#C44":"#A09890",fontWeight:rd<30?600:400}}>期限 {fmtDateShort(it.expiresAt)}（残{rd}日）</span>}</div></div><button onClick={()=>handleExport(it)} title="エクスポート" style={{background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"6px 8px",cursor:"pointer",flexShrink:0}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09890" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><button onClick={()=>onLoad(it.id)} style={{background:"#2C2420",color:"#fff",border:"none",borderRadius:6,padding:"8px 14px",fontSize:11,cursor:"pointer",flexShrink:0}}>開く</button><button onClick={()=>handleDelete(it.id)} style={{background:"none",border:"none",color:"#CCC5BE",fontSize:16,cursor:"pointer",flexShrink:0}}>✕</button></div>;})}</div></div>;}
 
 /* ━━━ Editor Tabs（1カラム） ━━━ */
 function EBas({d,u}){const img=useImg(b=>u("coverImage",b));
@@ -176,9 +384,10 @@ function EExt({d,u,th}){const a=th?.accent||"#C4956A";const bulk=useBulkImg(res=
   return<FS t="外観パース"><button onClick={bulk.go} disabled={bulk.uploading} style={{...S.bulkBtn,borderColor:a,color:a,marginBottom:12}}>{bulk.uploading?"アップロード中...":"画像を一括追加"}</button>{bulk.el}{d.exterior.views.map((v,i)=><ExtVI key={i} v={v} i={i} d={d} u={u} total={d.exterior.views.length} onMove={move}/>)}<button onClick={()=>u("exterior.views",[...d.exterior.views,{label:"",image:null}])} style={S.aB}>＋ 手動で追加</button><div style={{marginTop:16}}/><Fi l="説明" v={d.exterior.description} s={v=>u("exterior.description",v)} m rows={3}/></FS>;}
 function ExtVI({v,i,d,u,total,onMove}){const img=useImg(b=>u(`exterior.views.${i}.image`,b));return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8}}><MoveButtons index={i} total={total} onMove={onMove}/><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6}}><input value={v.label} onChange={e=>u(`exterior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><button onClick={()=>u("exterior.views",d.exterior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`exterior.views.${i}.image`,null)} small uploading={img.uploading}/>{img.el}</div></div>;}
 function EInt({d,u,th}){const a=th?.accent||"#C4956A";const bulk=useBulkImg(res=>{const v=[...d.interior.views];for(const r of res){const i=v.findIndex(x=>x.label===r.label);if(i>=0)v[i]={...v[i],image:r.image};else v.push({label:r.label,image:r.image,tag:""});}u("interior.views",v);});const move=(f,t)=>{const v=[...d.interior.views];const[it]=v.splice(f,1);v.splice(t,0,it);u("interior.views",v);};
-  const[sel,setSel]=useState(new Set());const toggle=i=>setSel(p=>{const n=new Set(p);n.has(i)?n.delete(i):n.add(i);return n;});const selAll=()=>setSel(sel.size===d.interior.views.length?new Set():new Set(d.interior.views.map((_,i)=>i)));const applyTag=tag=>{const v=[...d.interior.views];for(const i of sel)if(v[i])v[i]={...v[i],tag};u("interior.views",v);setSel(new Set());};
+  const[sel,setSel]=useState(new Set());const[cusTag,setCusTag]=useState("");const toggle=i=>setSel(p=>{const n=new Set(p);n.has(i)?n.delete(i):n.add(i);return n;});const selAll=()=>setSel(sel.size===d.interior.views.length?new Set():new Set(d.interior.views.map((_,i)=>i)));const applyTag=tag=>{const v=[...d.interior.views];for(const i of sel)if(v[i])v[i]={...v[i],tag};u("interior.views",v);setSel(new Set());};
+  const existingTags=[...new Set(d.interior.views.map(v=>v.tag).filter(Boolean))];const presetTags=["1F","2F","3F"];const customTags=existingTags.filter(t=>!presetTags.includes(t));
   return<FS t="内装 3Dビュー"><button onClick={bulk.go} disabled={bulk.uploading} style={{...S.bulkBtn,borderColor:a,color:a,marginBottom:12}}>{bulk.uploading?"アップロード中...":"画像を一括追加"}</button>{bulk.el}
-    {d.interior.views.length>0&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:12,padding:"8px 10px",background:"#fff",borderRadius:8,border:"1px solid #EDEAE6",flexWrap:"wrap"}}><button onClick={selAll} style={{fontSize:11,color:sel.size===d.interior.views.length?a:"#A09890",background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{sel.size===d.interior.views.length?"全解除":"全選択"}</button>{sel.size>0?<><span style={{fontSize:11,color:"#6B6560"}}>{sel.size}件 →</span>{["1F","2F","3F"].map(t=><button key={t} onClick={()=>applyTag(t)} style={{fontSize:11,color:"#fff",background:a,border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{t}</button>)}<button onClick={()=>applyTag("")} style={{fontSize:11,color:"#A09890",background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>解除</button></>:<span style={{fontSize:10,color:"#A09890"}}>チェックでタグ一括設定</span>}</div>}
+    {d.interior.views.length>0&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:12,padding:"8px 10px",background:"#fff",borderRadius:8,border:"1px solid #EDEAE6",flexWrap:"wrap"}}><button onClick={selAll} style={{fontSize:11,color:sel.size===d.interior.views.length?a:"#A09890",background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{sel.size===d.interior.views.length?"全解除":"全選択"}</button>{sel.size>0?<><span style={{fontSize:11,color:"#6B6560"}}>{sel.size}件 →</span>{presetTags.map(t=><button key={t} onClick={()=>applyTag(t)} style={{fontSize:11,color:"#fff",background:a,border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{t}</button>)}{customTags.map(t=><button key={t} onClick={()=>applyTag(t)} style={{fontSize:11,color:"#fff",background:"#7E8B9A",border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{t}</button>)}<div style={{display:"flex",gap:3,alignItems:"center"}}><input value={cusTag} onChange={e=>setCusTag(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&cusTag.trim()){applyTag(cusTag.trim());setCusTag("");}}} placeholder="カスタム" style={{...S.inp,width:72,padding:"4px 7px",fontSize:11}}/><button onClick={()=>{if(cusTag.trim()){applyTag(cusTag.trim());setCusTag("");}}} disabled={!cusTag.trim()} style={{fontSize:11,color:cusTag.trim()?"#fff":"#A09890",background:cusTag.trim()?a:"#E5E0DA",border:"none",borderRadius:6,padding:"5px 8px",cursor:cusTag.trim()?"pointer":"default"}}>設定</button></div><button onClick={()=>applyTag("")} style={{fontSize:11,color:"#A09890",background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>解除</button></>:<span style={{fontSize:10,color:"#A09890"}}>チェックでタグ一括設定</span>}</div>}
     {d.interior.views.map((v,i)=><IntVI key={i} v={v} i={i} d={d} u={u} total={d.interior.views.length} onMove={move} selected={sel.has(i)} onToggle={()=>toggle(i)} accent={a}/>)}<button onClick={()=>u("interior.views",[...d.interior.views,{label:"",image:null,tag:""}])} style={S.aB}>＋ 手動で追加</button><div style={{marginTop:16}}/><Fi l="説明" v={d.interior.description} s={v=>u("interior.description",v)} m rows={3}/></FS>;}
 function IntVI({v,i,d,u,total,onMove,selected,onToggle,accent}){const a=accent||"#C4956A";const img=useImg(b=>u(`interior.views.${i}.image`,b));
   return<div style={{marginBottom:8,padding:10,background:selected?`${a}0F`:"#fff",borderRadius:10,border:selected?`1.5px solid ${a}`:"1px solid #EDEAE6",display:"flex",gap:8,transition:"all .15s"}}><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><button onClick={onToggle} style={{width:20,height:20,borderRadius:4,border:selected?`2px solid ${a}`:"2px solid #D5D0CA",background:selected?a:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>{selected&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}</button><MoveButtons index={i} total={total} onMove={onMove}/></div><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}><input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><TagSelect value={v.tag||""} onChange={val=>u(`interior.views.${i}.tag`,val)}/><button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small uploading={img.uploading}/>{img.el}</div></div>;}
@@ -211,7 +420,7 @@ function CV({data,onWt,onZoom}){const th=T(data);const ref=useRef(null);const[sy
   return<><div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div>
     <button onClick={()=>setSh(true)} style={{position:"fixed",bottom:24,right:24,zIndex:100,width:52,height:52,borderRadius:"50%",background:th.dark,border:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.25)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
     {sh&&<SharePanel onClose={()=>setSh(false)} th={th}/>}</>;}
-function PV({data,onBack,onWt,onZoom}){const th=T(data);const ref=useRef(null);const[sy,setSy]=useState(0);useEffect(()=>{const el=ref.current;if(!el)return;const h=()=>setSy(el.scrollTop);el.addEventListener("scroll",h,{passive:true});return()=>el.removeEventListener("scroll",h);},[]);return<><button onClick={onBack} style={S.bk}>◀ 編集</button><div ref={ref} style={S.sc}><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div></>;}
+/* ━━━ B/A Slider ━━━ */
 
 /* ━━━ B/A Slider ━━━ */
 function BASlider({before,after}){const cRef=useRef(null);const[pos,setPos]=useState(50);const drag=useRef(false);
@@ -262,6 +471,7 @@ function Pres({data,sy,onWt,onZoom}){
       <div style={{width:40,height:1,background:`${th.accent}33`,margin:"0 auto 36px"}}/>
       <div style={{fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:2,lineHeight:2.4}}>喜多ハウジング株式会社<br/>{data.contact.address}</div>
       {data.staffName&&<div style={{marginTop:24,fontSize:12,color:"rgba(255,255,255,0.35)"}}>担当：{data.staffName}</div>}
+      {data.expiresAt&&<div style={{marginTop:24,fontSize:10,color:"rgba(255,255,255,0.25)",letterSpacing:1}}>閲覧期限：{fmtDateShort(data.expiresAt)}</div>}
       <div style={{marginTop:48,fontSize:9,color:"rgba(255,255,255,0.1)",letterSpacing:3}}>© 2026 KITA HOUSING CO., LTD.</div>
     </div></InView></PSec>
   </>;
