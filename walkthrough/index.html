@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喜多ハウジング ウォークスルービューア</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0b'/><path d='M6 22 L11 10 L16 18 L19 13 L26 22Z' fill='%23c8ff00' opacity='0.9'/><circle cx='22' cy='10' r='3' fill='%23c8ff00' opacity='0.6'/></svg>">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#16213a; --surface:#1e2d50; --border:#2e4070;
+    --accent:#1f3c8c; --accent-dim:rgba(31,60,140,0.15);
+    --accent-light:#6b95e8; --accent-glow:rgba(31,60,140,0.3);
+    --text:#f0f4ff; --muted:#a8b8d8; --panel-w:280px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Syne',sans-serif; overflow:hidden; height:100vh; width:100vw; }
+  #canvas-container { position:fixed; inset:0; z-index:0; }
+  canvas { display:block; touch-action:none; }
+  #ui { position:fixed; inset:0; z-index:10; pointer-events:none; }
+
+  /* Top bar */
+  #topbar { position:absolute; top:0; left:0; right:0; height:52px; background:linear-gradient(180deg,rgba(22,33,58,0.97) 0%,transparent 100%); display:flex; align-items:center; padding:0 20px; gap:16px; pointer-events:all; }
+  #logo { font-size:13px; font-weight:800; letter-spacing:0.15em; text-transform:uppercase; color:var(--accent); }
+  #model-name { font-family:'DM Mono',monospace; font-size:12px; color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .btn { background:var(--accent); color:#0d0a0f; border:none; font-family:'Syne',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:7px 16px; border-radius:999px; cursor:pointer; transition:opacity 0.15s; }
+  .btn:hover { opacity:0.82; }
+  .btn.secondary { background:transparent; color:var(--text); border:1px solid var(--border); border-radius:999px; }
+  .btn.secondary:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* Panel */
+  #panel-toggle { position:absolute; top:52px; left:0; background:var(--surface); border:1px solid var(--border); border-left:none; padding:10px 8px; cursor:pointer; pointer-events:all; z-index:11; transition:left 0.3s cubic-bezier(0.16,1,0.3,1); font-size:14px; line-height:1; color:var(--text); font-family:monospace; }
+  #panel-toggle.open { left:var(--panel-w); }
+  #panel-left { position:absolute; top:52px; left:0; bottom:0; width:var(--panel-w); background:rgba(22,33,58,0.96); backdrop-filter:blur(16px); border-right:1px solid var(--border); display:flex; flex-direction:column; transform:translateX(-100%); transition:transform 0.3s cubic-bezier(0.16,1,0.3,1); pointer-events:all; overflow-y:auto; }
+  #panel-left.open { transform:translateX(0); }
+  #panel-left::-webkit-scrollbar { width:3px; }
+  #panel-left::-webkit-scrollbar-thumb { background:var(--border); }
+  .panel-section { border-bottom:1px solid var(--border); }
+  .panel-header { padding:12px 20px; font-size:10px; font-weight:700; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:color 0.2s; }
+  .panel-header:hover { color:var(--text); }
+  .panel-header .arrow { font-size:10px; transition:transform 0.25s; }
+  .panel-header.open .arrow { transform:rotate(180deg); }
+  .panel-body { padding:8px 0; display:none; }
+  .panel-body.open { display:block; }
+  .cam-item { display:flex; align-items:center; gap:10px; padding:10px 20px; cursor:pointer; transition:background 0.1s; border-left:2px solid transparent; }
+  .cam-item:hover { background:rgba(31,60,140,0.08); }
+  .cam-item.active { border-left-color:var(--accent-light); background:rgba(31,60,140,0.12); }
+  .cam-icon { width:28px; height:28px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+  .cam-item.active .cam-icon { border-color:var(--accent); }
+  .cam-label { font-family:'DM Mono',monospace; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hdr-presets { padding:8px 12px; }
+  .hdr-preset-btn { width:100%; text-align:left; padding:8px 12px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; margin-bottom:4px; transition:all 0.2s; }
+  .hdr-preset-btn:hover { border-color:var(--accent-light); color:var(--accent-light); }
+  .hdr-preset-btn.active { border-color:var(--accent-light); background:rgba(31,60,140,0.12); color:var(--accent-light); }
+  .hdr-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:8px 20px 12px; }
+  .hdr-toggle-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); }
+  .mini-toggle { position:relative; width:32px; height:18px; }
+  .mini-toggle input { opacity:0; width:0; height:0; }
+  .mini-slider { position:absolute; inset:0; background:rgba(255,255,255,0.1); border-radius:18px; cursor:pointer; transition:background 0.2s; }
+  .mini-slider::before { content:''; position:absolute; width:12px; height:12px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform 0.2s; }
+  .mini-toggle input:checked+.mini-slider { background:var(--accent); }
+  .mini-toggle input:checked+.mini-slider::before { transform:translateX(14px); }
+  .slider-row { display:flex; align-items:center; gap:6px; padding:5px 16px; font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); }
+  .slider-row label { width:62px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .slider-row input[type="range"] { flex:1; height:3px; -webkit-appearance:none; appearance:none; background:var(--border); outline:none; border-radius:2px; cursor:pointer; }
+  .slider-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); cursor:pointer; }
+  .slider-row input[type="range"]::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:var(--accent); border:none; cursor:pointer; }
+  .slider-val { width:34px; text-align:right; font-size:10px; color:var(--text); flex-shrink:0; }
+  .slider-group-label { padding:8px 16px 2px; font-family:'DM Mono',monospace; font-size:9px; font-weight:700; letter-spacing:0.1em; color:var(--accent-light); }
+  .slider-row input[type="color"] { flex:1; height:22px; border:1px solid var(--border); background:var(--surface); cursor:pointer; padding:1px 2px; max-width:80px; }
+  #controls-hint { padding:14px 20px; font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); line-height:1.9; }
+  .hint-key { display:inline-block; background:var(--border); padding:1px 5px; font-size:9px; color:var(--text); }
+
+  /* Loading */
+  #loading-overlay { position:fixed; inset:0; z-index:9000; background:radial-gradient(ellipse at 50% 0%,#1e3060 0%,#16213a 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; transition:opacity 0.4s; padding:20px; opacity:0; pointer-events:none; }
+  #loading-overlay.visible { opacity:1; pointer-events:all; }
+  #loading-overlay.hidden { opacity:0; pointer-events:none; }
+  .loading-spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-text { font-family:'DM Mono',monospace; font-size:12px; color:var(--text); text-align:center; }
+  .loading-slow { font-family:'DM Mono',monospace; font-size:11px; color:var(--accent-light); text-align:center; display:none; }
+  .loading-progress { width:220px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .loading-progress-bar { height:100%; background:var(--accent-light); width:0%; transition:width 0.2s; }
+  .loading-error { color:#f47878; font-family:'DM Mono',monospace; font-size:12px; display:none; text-align:center; max-width:400px; line-height:1.6; }
+  .loading-info { max-width:420px; width:100%; }
+  .loading-info-box { background:rgba(31,60,140,0.2); border:1px solid rgba(107,149,232,0.25); border-radius:12px; padding:14px 18px; margin-bottom:10px; }
+  .loading-info-title { font-family:'DM Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.1em; color:var(--accent-light); margin-bottom:8px; }
+  .loading-info-row { font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); line-height:1.8; }
+  .loading-info-row b { color:var(--text); font-weight:500; }
+  .loading-disclaimer { font-family:'DM Mono',monospace; font-size:11px; color:var(--text); text-align:center; line-height:1.6; margin-top:4px; }
+  .loading-expiry { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-align:center; margin-top:2px; }
+
+  /* PC/スマホ出し分け */
+  .info-mobile { display:none; }
+  .info-desktop { display:block; }
+  body.is-mobile .info-mobile { display:block; }
+  body.is-mobile .info-desktop { display:none; }
+
+  /* 横画面スマホ: コンパクト化 */
+  @media (max-height: 420px) {
+    #loading-overlay { gap:8px; padding:10px 20px; }
+    .loading-spinner { width:24px; height:24px; }
+    .loading-info-box { padding:8px 12px; margin-bottom:6px; }
+    .loading-info-title { font-size:9px; margin-bottom:4px; }
+    .loading-info-row { font-size:10px; line-height:1.5; }
+    .loading-disclaimer, .loading-expiry { font-size:9px; margin-top:2px; }
+    .loading-slow { font-size:10px; }
+  }
+
+  /* In-scene UI */
+  #lock-msg { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(22,33,58,0.92); border:1px solid var(--border); padding:8px 20px; border-radius:999px; font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); pointer-events:none; white-space:nowrap; display:none; }
+  #btn-fullscreen { position:absolute; bottom:16px; right:16px; width:36px; height:36px; background:rgba(22,33,58,0.82); border:1px solid var(--border); color:var(--muted); font-size:16px; cursor:pointer; pointer-events:all; display:none; align-items:center; justify-content:center; border-radius:10px; backdrop-filter:blur(4px); transition:all 0.2s; z-index:12; }
+  #btn-fullscreen:hover { color:var(--accent); border-color:var(--accent); }
+  body.walking { cursor:none; }
+  #crosshair { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; display:none; }
+  #crosshair::before, #crosshair::after { content:''; position:absolute; background:rgba(74,111,212,0.85); }
+  #crosshair::before { width:12px; height:1px; top:0; left:-6px; }
+  #crosshair::after { width:1px; height:12px; top:-6px; left:0; }
+  #fps-badge { position:absolute; top:60px; right:14px; font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); pointer-events:none; }
+
+  /* 計測ツール */
+  #btn-measure { position:absolute; bottom:16px; right:16px; width:36px; height:36px; background:rgba(22,33,58,0.82); border:1px solid var(--border); color:var(--muted); font-size:16px; cursor:pointer; pointer-events:all; display:flex; align-items:center; justify-content:center; border-radius:10px; backdrop-filter:blur(4px); transition:all 0.2s; z-index:12; }
+  #btn-measure:hover { color:var(--accent); border-color:var(--accent); }
+  #btn-measure.active { color:var(--accent-light); border-color:var(--accent-light); background:rgba(31,60,140,0.15); }
+  body.is-mobile #btn-measure { right:60px; }
+  .measure-label { position:absolute; pointer-events:none; z-index:20; font-family:'DM Mono',monospace; font-size:12px; color:#fff; background:rgba(22,33,58,0.92); border:1px solid var(--accent-light); padding:3px 10px; border-radius:999px; white-space:nowrap; transform:translate(-50%,-100%); margin-top:-8px; }
+  #measure-hint { position:absolute; bottom:60px; left:50%; transform:translateX(-50%); font-family:'DM Mono',monospace; font-size:11px; color:var(--accent-light); background:rgba(22,33,58,0.92); border:1px solid var(--border); padding:6px 18px; border-radius:999px; pointer-events:none; display:none; white-space:nowrap; }
+
+  @media (max-width:600px) { :root { --panel-w:240px; } .loading-info-box { padding:10px 14px; } }
+
+  /* ── 事前確認オーバーレイ ── */
+  #preload-overlay { position:fixed; inset:0; z-index:9500; background:radial-gradient(ellipse at 50% 0%,#1e3060 0%,#16213a 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(8px,2vh,18px); padding:clamp(12px,3vw,24px); transition:opacity 0.4s; }
+  #preload-overlay.hidden { opacity:0; pointer-events:none; }
+  .kita-logo-name { font-family:'Cormorant Garamond',serif; font-size:clamp(22px,5vw,36px); font-weight:600; letter-spacing:0.04em; color:#1f3c8c; line-height:1; }
+  .kita-logo-name em { color:#1f3c8c; opacity:0.55; font-style:italic; }
+  .kita-logo-sub { font-family:'DM Mono',monospace; font-size:clamp(8px,1.5vw,9px); color:var(--muted); letter-spacing:0.3em; text-transform:uppercase; margin-top:4px; }
+  .kita-logo-divider { width:40px; height:1px; background:linear-gradient(90deg,transparent,rgba(31,60,140,0.5),transparent); margin:6px auto 0; }
+  .preload-card { background:rgba(31,60,140,0.15); border:1px solid rgba(107,149,232,0.25); border-radius:clamp(10px,2vw,18px); padding:clamp(10px,2vh,22px) clamp(14px,3vw,26px); max-width:400px; width:100%; backdrop-filter:blur(8px); }
+  .preload-card-title { font-family:'Syne',sans-serif; font-size:10px; font-weight:700; letter-spacing:0.2em; color:var(--accent-light); text-transform:uppercase; margin-bottom:clamp(6px,1vh,12px); }
+  .preload-info-row { display:flex; align-items:center; justify-content:space-between; padding:clamp(5px,1vh,9px) 0; border-bottom:1px solid rgba(255,255,255,0.05); font-family:'DM Mono',monospace; font-size:clamp(11px,2vw,12px); }
+  .preload-info-row:last-child { border-bottom:none; }
+  .preload-info-label { color:var(--muted); }
+  .preload-info-val { color:var(--text); font-weight:600; }
+  .wifi-banner { background:rgba(31,60,140,0.18); border:1px solid rgba(107,149,232,0.3); border-radius:clamp(10px,2vw,14px); padding:clamp(8px,1.5vh,12px) clamp(12px,2vw,16px); display:flex; align-items:flex-start; gap:10px; max-width:400px; width:100%; }
+  .wifi-banner-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+  .wifi-banner-text { font-family:'DM Mono',monospace; font-size:clamp(10px,2vw,11px); color:var(--text); line-height:1.6; }
+  .wifi-banner-text b { font-size:clamp(11px,2vw,12px); display:block; margin-bottom:2px; color:var(--accent-light); }
+  .start-btn { max-width:400px; width:100%; padding:clamp(11px,1.8vh,15px); background:linear-gradient(135deg,#2a4fa8 0%,#1f3c8c 100%); border:none; border-radius:999px; color:#e8eeff; font-family:'Syne',sans-serif; font-size:clamp(11px,2vw,13px); font-weight:800; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 24px rgba(31,60,140,0.35); }
+  .start-btn:hover { box-shadow:0 6px 32px rgba(31,60,140,0.5); transform:translateY(-1px); opacity:0.92; }
+  .preload-disclaimer { font-family:'DM Mono',monospace; font-size:clamp(9px,1.8vw,11px); color:var(--text); text-align:center; line-height:1.6; max-width:360px; }
+
+  /* 極端に縦が小さい場合（横向きスマホ等）はさらに要素を間引く */
+  @media (max-height: 480px) {
+    .kita-logo-divider, .kita-logo-sub { display:none; }
+    .preload-card-title { display:none; }
+    #preload-overlay { gap:6px; }
+  }
+
+  #rotate-msg { display:none; position:fixed; inset:0; z-index:9999; background:radial-gradient(ellipse at 50% 0%,#1e3060 0%,#16213a 70%); flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--text); font-family:'Syne',sans-serif; }
+  #rotate-msg .rotate-icon { font-size:48px; animation:rotateHint 2s ease-in-out infinite; }
+  #rotate-msg .rotate-text { font-size:14px; color:var(--muted); }
+  @keyframes rotateHint { 0%,100% { transform:rotate(0deg); } 50% { transform:rotate(90deg); } }
+  @media (max-width:960px) and (orientation:portrait) { body.is-mobile #rotate-msg { display:flex !important; } }
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div id="rotate-msg"><div class="rotate-icon">📱</div><div class="rotate-text">横向きにしてください</div></div>
+
+<div id="preload-overlay">
+  <!-- KitaHousing ロゴ -->
+  <div style="text-align:center;margin-bottom:4px;">
+    <div class="kita-logo-name">Kita<em>Housing</em></div>
+    <div class="kita-logo-divider"></div>
+    <div class="kita-logo-sub">Walk-Through Viewer</div>
+  </div>
+
+  <!-- ファイル情報カード -->
+  <div class="preload-card">
+    <div class="preload-card-title">📦 データ情報</div>
+    <div class="preload-info-row">
+      <span class="preload-info-label">ファイルサイズ</span>
+      <span class="preload-info-val" id="preload-size">取得中...</span>
+    </div>
+    <div class="preload-info-row">
+      <span class="preload-info-label">形式</span>
+      <span class="preload-info-val">3D ウォークスルー (GLB)</span>
+    </div>
+  </div>
+
+  <!-- WiFi推奨バナー -->
+  <div class="wifi-banner">
+    <div class="wifi-banner-icon">📶</div>
+    <div class="wifi-banner-text">
+      <b>Wi-Fi のご利用を推奨します</b>
+      データサイズが大きいため、モバイル回線ではダウンロードに時間がかかる場合があります。
+    </div>
+  </div>
+
+  <button class="start-btn" id="preload-start-btn" onclick="startWalkthrough()">ウォークスルーを開始 →</button>
+
+  <div class="preload-disclaimer">※ 3Dソフトの表現上、実際の施工・仕上がりとは異なる箇所がございます。</div>
+</div>
+
+<div id="loading-overlay">
+  <div class="loading-spinner" id="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">読み込み中...</div>
+  <div class="loading-slow" id="loading-slow">⏳ データサイズが大きいため時間がかかっています...</div>
+  <div class="loading-progress"><div class="loading-progress-bar" id="loading-progress-bar"></div></div>
+  <div class="loading-error" id="loading-error"></div>
+  <div class="loading-info" id="loading-info">
+    <div class="loading-info-box">
+      <div class="loading-info-title">🎮 操作方法</div>
+      <div class="loading-info-row info-mobile">画面左半分をドラッグ → 移動<br>画面右半分をドラッグ → 視点操作<br>右下の ⛶ ボタン → 全画面表示</div>
+      <div class="loading-info-row info-desktop">画面クリック → 歩行モード開始<br>W A S D キー → 移動<br>マウス → 視点操作 ／ Esc → 解除</div>
+    </div>
+    <div class="loading-disclaimer">※3Dソフトの表現上、実際の施工・仕上がりとは異なる箇所がございます。</div>
+    <div class="loading-expiry" id="loading-expiry"></div>
+  </div>
+</div>
+
+<div id="ui">
+  <div id="topbar"><div id="logo" style="display:flex;flex-direction:column;line-height:1.15;"><span style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:700;letter-spacing:0.04em;color:#f0f4ff;">Kita<em style="font-style:italic;color:#6b95e8;">Housing</em></span><span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:0.28em;font-weight:400;margin-top:1px;">WALK VIEW</span></div><div id="model-name"></div></div>
+  <button id="panel-toggle" onclick="togglePanel()">☰</button>
+  <div id="panel-left">
+    <div class="panel-section"><div class="panel-header open" onclick="toggleSection(this)"><span>📷 カメラ</span><span class="arrow">▾</span></div><div class="panel-body open" id="camera-list"><div style="padding:16px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">GLBを読み込むと表示</div></div></div>
+    <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>🌅 HDR 環境光</span><span class="arrow">▾</span></div><div class="panel-body" id="hdr-body"><div class="hdr-toggle-row"><span class="hdr-toggle-label">背景に表示</span><label class="mini-toggle"><input type="checkbox" id="hdr-bg-toggle" checked onchange="toggleHDRBackground()"><div class="mini-slider"></div></label></div><div class="hdr-presets" id="hdr-presets"></div></div></div>
+    <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>💡 ライティング調整</span><span class="arrow">▾</span></div><div class="panel-body" id="light-body">
+      <div class="slider-group-label">▸ トーンマッピング</div>
+      <div class="slider-row"><label>露出</label><input type="range" min="0.1" max="3" step="0.05" value="0.7" id="sl-exposure" oninput="updateLighting()"><span class="slider-val" id="sv-exposure">0.70</span></div>
+      <div class="slider-group-label">▸ 直射光 (Directional)</div>
+      <div class="slider-row"><label>強度</label><input type="range" min="0" max="20" step="0.1" value="10" id="sl-dir" oninput="updateLighting()"><span class="slider-val" id="sv-dir">10.0</span></div>
+      <div class="slider-row"><label>色</label><input type="color" value="#ffffff" id="sl-dir-color" oninput="updateLighting()"><span class="slider-val" id="sv-dir-color">#fff</span></div>
+      <div class="slider-row"><label>水平角</label><input type="range" min="0" max="360" step="1" value="45" id="sl-dir-azimuth" oninput="updateLighting()"><span class="slider-val" id="sv-dir-azimuth">45°</span></div>
+      <div class="slider-row"><label>仰角</label><input type="range" min="5" max="90" step="1" value="45" id="sl-dir-elevation" oninput="updateLighting()"><span class="slider-val" id="sv-dir-elevation">45°</span></div>
+      <div class="hdr-toggle-row" style="padding:4px 16px 8px"><span class="hdr-toggle-label">影</span><label class="mini-toggle"><input type="checkbox" id="sl-dir-shadow" checked oninput="updateLighting()"><div class="mini-slider"></div></label></div>
+      <div class="slider-row"><label>NormalBias</label><input type="range" min="0" max="0.2" step="0.001" value="0.03" id="sl-normal-bias" oninput="updateLighting()"><span class="slider-val" id="sv-normal-bias">0.030</span></div>
+      <div class="slider-group-label">▸ 環境光 (Ambient)</div>
+      <div class="slider-row"><label>強度</label><input type="range" min="0" max="5" step="0.01" value="0.6" id="sl-amb" oninput="updateLighting()"><span class="slider-val" id="sv-amb">0.60</span></div>
+      <div class="slider-row"><label>色</label><input type="color" value="#ffffff" id="sl-amb-color" oninput="updateLighting()"><span class="slider-val" id="sv-amb-color">#fff</span></div>
+      <div class="slider-group-label">▸ 半球光 (Hemisphere)</div>
+      <div class="slider-row"><label>強度</label><input type="range" min="0" max="2" step="0.01" value="1.0" id="sl-hemi" oninput="updateLighting()"><span class="slider-val" id="sv-hemi">1.00</span></div>
+      <div class="slider-row"><label>天空色</label><input type="color" value="#ffffff" id="sl-hemi-sky" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-sky">#fff</span></div>
+      <div class="slider-row"><label>地面色</label><input type="color" value="#ffffff" id="sl-hemi-gnd" oninput="updateLighting()"><span class="slider-val" id="sv-hemi-gnd">#ffffff</span></div>
+      <div class="slider-group-label">▸ マテリアル / ポスプロ</div>
+      <div class="slider-row"><label>反射強度</label><input type="range" min="0" max="1" step="0.1" value="0.1" id="sl-envmap" oninput="updateLighting()"><span class="slider-val" id="sv-envmap">0.3</span></div>
+      <div class="slider-row"><label>スポットライト強度</label><input type="range" min="0" max="1" step="0.01" value="0.2" id="sl-emissive-mul" oninput="updateLighting()"><span class="slider-val" id="sv-emissive-mul">0.2</span></div>
+      <div class="slider-row"><label>ポイントライト強度</label><input type="range" min="0" max="0.5" step="0.001" value="0.15" id="sl-point-mul" oninput="updateLighting()"><span class="slider-val" id="sv-point-mul">0.150</span></div>
+      <div style="padding:4px 16px 12px"><button class="btn secondary" style="width:100%;padding:6px;font-size:10px" onclick="resetLighting()">リセット</button></div>
+    </div></div>
+
+    <div class="panel-section"><div class="panel-header" onclick="toggleSection(this)"><span>📸 書き出し</span><span class="arrow">▾</span></div><div class="panel-body" id="export-body">
+      <div style="padding:12px 16px 14px">
+        <button id="btn-capture" class="btn" style="width:100%;padding:9px;font-size:12px" onclick="captureAllCameras()" disabled>全カメラをZIPで保存</button>
+        <div id="capture-status" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:center;display:none"></div>
+      </div>
+    </div></div>
+    <div style="margin-top:auto;"><div id="controls-hint"><span class="hint-key">W A S D</span> 移動<br><span class="hint-key">Mouse</span> 視点<br><span class="hint-key">Space</span> 上昇 &nbsp;<span class="hint-key">Shift</span> 下降<br><span class="hint-key">Esc</span> 解放<br><br><span style="color:var(--accent)">📱 モバイル</span><br>左半分ドラッグ → 移動<br>右半分ドラッグ → 視点</div></div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="lock-msg">クリックして歩行モード開始 — Escで解放</div>
+  <div id="fps-badge"></div>
+  <button id="btn-fullscreen" onclick="toggleFullscreen()">⛶</button>
+  <button id="btn-measure" onclick="toggleMeasure()" title="計測">📏</button>
+  <div id="measure-hint">計測: 壁・床・天井をクリック → 対面までの距離</div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+
+/* ── Utility ── */
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+if (isMobile) document.body.classList.add('is-mobile');
+
+/* ── Fullscreen toggle ── */
+window.toggleFullscreen = function () {
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
+  } else {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) return;
+    req.call(el).then(() => { screen.orientation?.lock?.('landscape').catch(() => {}); }).catch(() => {});
+  }
+};
+function updateFsIcon() {
+  document.getElementById('btn-fullscreen').textContent =
+    (document.fullscreenElement || document.webkitFullscreenElement) ? '✕' : '⛶';
+}
+document.addEventListener('fullscreenchange', updateFsIcon);
+document.addEventListener('webkitfullscreenchange', updateFsIcon);
+if (isMobile && (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
+  document.getElementById('btn-fullscreen').style.display = 'flex';
+}
+
+/* ── URL Params (短縮 g/u、旧形式 glb/uploaded も互換) ── */
+const params = new URLSearchParams(window.location.search);
+const autoGlb = params.get('g') || params.get('glb');
+const uploadedDate = params.get('u') || params.get('uploaded');
+
+if (uploadedDate) {
+  try {
+    const d = new Date(uploadedDate);
+    d.setFullYear(d.getFullYear() + 1);
+    document.getElementById('loading-expiry').textContent =
+      'このデータの閲覧期限: ' + d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+  } catch (e) { /* invalid date */ }
+}
+
+/* ── Renderer ── */
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.0));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = !isMobile;
+if (!isMobile) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.7;
+container.appendChild(renderer.domElement);
+
+/* ── Scene & Camera ── */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0b);
+const walkCamera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 500);
+walkCamera.position.set(0, 1.6, 0);
+let activeCamera = walkCamera;
+let glbCameras = [];
+let activeCamIdx = -1;
+
+/* ── Post-processing (PC only): SMAA + Vignette/Grain ── */
+const VignetteGrainShader = {
+  uniforms: {
+    'tDiffuse': { value: null },
+    'vignetteIntensity': { value: 0.25 },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float vignetteIntensity;
+    varying vec2 vUv;
+    void main(){
+      vec4 col = texture2D(tDiffuse, vUv);
+      float d = distance(vUv, vec2(0.5));
+      col.rgb *= 1.0 - vignetteIntensity * d * d * 2.0;
+      gl_FragColor = col;
+    }
+  `
+};
+
+let composer = null, renderPass = null, smaaPass = null, vignetteGrainPass = null;
+if (!isMobile) {
+  const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { samples: 4 });
+  composer = new EffectComposer(renderer, renderTarget);
+  renderPass = new RenderPass(scene, walkCamera);
+  composer.addPass(renderPass);
+  composer.addPass(new OutputPass());
+  smaaPass = new SMAAPass(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio());
+  composer.addPass(smaaPass);
+  vignetteGrainPass = new ShaderPass(VignetteGrainShader);
+  composer.addPass(vignetteGrainPass);
+}
+
+/* ── Lighting ── */
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 10);
+dirLight.position.set(15, 30, 15);
+dirLight.castShadow = !isMobile;
+if (!isMobile) {
+  Object.assign(dirLight.shadow.mapSize, { width: 4096, height: 4096 });
+  Object.assign(dirLight.shadow.camera, { near: 0.1, far: 300, left: -60, right: 60, top: 60, bottom: -60 });
+  dirLight.shadow.bias = -0.001;
+  dirLight.shadow.normalBias = 0.02;
+}
+scene.add(dirLight);
+
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.8);
+scene.add(hemiLight);
+
+/** Emissive由来のSpotLight管理配列 */
+let emissiveLights = [];
+let emissiveLightGroups = []; // { sl, pl, pos3 }
+
+
+/* ── HDR Environment ── */
+const rgbeLoader = new RGBELoader();
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+// Default environment (gradient)
+{
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, '#a0a8b8'); g.addColorStop(0.4, '#8890a0');
+  g.addColorStop(0.5, '#707888'); g.addColorStop(1, '#404550');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = pmremGenerator.fromEquirectangular(tex).texture;
+  tex.dispose();
+}
+
+let currentEnvMap = null, currentBgMap = null, hdrBgEnabled = true, HDR_PRESETS = [];
+
+async function buildHDRPanel() {
+  const ct = document.getElementById('hdr-presets');
+  ct.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">読み込み中...</div>';
+  try {
+    // hdr/files.json からファイル一覧を取得（GitHub API不要）
+    const res = await fetch('./hdr/files.json');
+    if (!res.ok) throw new Error('files.json not found');
+    const files = await res.json(); // ["file1.hdr", "file2.hdr"]
+    HDR_PRESETS = files.filter(f => f.toLowerCase().endsWith('.hdr')).map(f => ({ file: f }));
+    if (!HDR_PRESETS.length) throw new Error('No HDR files');
+  } catch (e) {
+    ct.innerHTML = '<div style="padding:8px 12px;font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">hdr/files.json を作成してください<br><span style="font-size:9px;opacity:0.6">例: ["room.hdr", "outdoor.hdr"]</span></div>';
+    return;
+  }
+  ct.innerHTML = '';
+  HDR_PRESETS.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.className = 'hdr-preset-btn'; b.id = 'hdr-btn-' + i;
+    b.textContent = p.file; b.onclick = () => loadHDR(i);
+    ct.appendChild(b);
+  });
+  if (HDR_PRESETS.length > 0) loadHDR(0).catch(() => {});
+}
+
+function loadHDR(idx) {
+  const p = HDR_PRESETS[idx];
+  if (!p) return Promise.resolve();
+  document.querySelectorAll('.hdr-preset-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  return new Promise((resolve, reject) => {
+    rgbeLoader.load('./hdr/' + p.file, (tex) => {
+      if (currentBgMap) currentBgMap.dispose();
+      currentBgMap = pmremGenerator.fromEquirectangular(tex).texture;
+      // Grayscale for reflection
+      const d = tex.image.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = d[i]*0.2126 + d[i+1]*0.7152 + d[i+2]*0.0722;
+        d[i] = gray; d[i+1] = gray; d[i+2] = gray;
+      }
+      tex.needsUpdate = true;
+      if (currentEnvMap) currentEnvMap.dispose();
+      currentEnvMap = pmremGenerator.fromEquirectangular(tex).texture;
+      tex.dispose();
+      scene.environment = currentEnvMap;
+      if (hdrBgEnabled) { scene.background = currentBgMap; scene.backgroundIntensity = 1.0; }
+      resolve();
+    }, undefined, reject);
+  });
+}
+
+window.toggleHDRBackground = function () {
+  hdrBgEnabled = document.getElementById('hdr-bg-toggle').checked;
+  if (hdrBgEnabled && currentBgMap) {
+    scene.background = currentBgMap; scene.backgroundIntensity = 1.0; scene.fog = null;
+  } else {
+    scene.background = new THREE.Color(0x0a0a0b); scene.backgroundIntensity = 1;
+    if (loadedModel) scene.fog = new THREE.Fog(0x0a0a0b, 30, 120);
+  }
+};
+
+/* ── GLB Loader ── */
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+let loadedModel = null;
+
+function setLoading(text, pct) {
+  document.getElementById('loading-text').textContent = text;
+  if (pct !== undefined) document.getElementById('loading-progress-bar').style.width = pct + '%';
+}
+
+function showError(msg) {
+  document.getElementById('loading-error').textContent = msg; // textContent = XSS safe
+  document.getElementById('loading-error').style.display = 'block';
+  document.getElementById('loading-spinner').style.display = 'none';
+  document.getElementById('loading-info').style.display = 'none';
+  document.querySelector('.loading-progress').style.display = 'none';
+  document.getElementById('loading-slow').style.display = 'none';
+}
+
+let slowTimer = null;
+function startSlowTimer() {
+  slowTimer = setTimeout(() => { document.getElementById('loading-slow').style.display = 'block'; }, 15000);
+}
+function clearSlowTimer() {
+  if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; }
+  document.getElementById('loading-slow').style.display = 'none';
+}
+
+/** 旧モデルの geometry / material / texture を解放 */
+function disposeModel(obj) {
+  if (!obj) return;
+  obj.traverse((child) => {
+    if (!child.isMesh) return;
+    if (child.geometry) child.geometry.dispose();
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => {
+      if (!m) return;
+      for (const key of Object.keys(m)) {
+        if (m[key] && m[key].isTexture) m[key].dispose();
+      }
+      m.dispose();
+    });
+  });
+}
+
+/** Emissive SpotLight を全削除 */
+function clearEmissiveLights() {
+  emissiveLights.forEach(l => {
+    scene.remove(l);
+    if (l.target) scene.remove(l.target);
+    l.dispose();
+  });
+  emissiveLights = [];
+  emissiveLightGroups = [];
+}
+
+function loadGLB(url, displayUrl) {
+  // ローディングオーバーレイを表示
+  const ov = document.getElementById('loading-overlay');
+  ov.classList.remove('hidden');
+  ov.classList.add('visible');
+
+  setLoading('GLBデータをダウンロード中...', 5);
+  startSlowTimer();
+
+  gltfLoader.load(url,
+    (gltf) => {
+      clearSlowTimer();
+      setLoading('シーンを構築中...', 70);
+
+      // メモリ解放
+      if (loadedModel) { scene.remove(loadedModel); disposeModel(loadedModel); }
+      clearEmissiveLights();
+      loadedModel = gltf.scene;
+
+      // メッシュ設定
+      gltf.scene.traverse(obj => {
+        if (!obj.isMesh) return;
+        obj.castShadow = !isMobile;
+        obj.receiveShadow = !isMobile;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        if (mats.some(m => m.transparent && m.opacity <= 0.9)) obj.castShadow = false;
+        if (obj.name && /Tree/i.test(obj.name)) mats.forEach(m => { m.side = THREE.DoubleSide; });
+        mats.forEach(m => {
+          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+            m.envMapIntensity = 0.1; m.needsUpdate = true;
+          }
+        });
+      });
+      scene.add(gltf.scene);
+      saveMaterialOriginals();
+      resetMaterialOffsets(false);
+      // Emissive → SpotLight 変換（スマホは省略して軽量化）
+      setLoading('ライトを配置中...', 80);
+      if (!isMobile) {
+      const ec = [];
+      gltf.scene.traverse(obj => {
+        if (!obj.isMesh) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const m of mats) {
+          const hasEmissive = m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0;
+          const hasMap = !!m.emissiveMap;
+          if ((m.emissiveIntensity || 0) >= 1 && (hasEmissive || hasMap)) {
+            const pos = new THREE.Vector3(); obj.getWorldPosition(pos);
+            const box3 = new THREE.Box3().setFromObject(obj);
+            const sz = box3.getSize(new THREE.Vector3());
+            ec.push({ pos, boxMinY: box3.min.y, color: m.emissive.clone(), intensity: Math.min(m.emissiveIntensity, 15), distance: Math.max(Math.max(sz.x, sz.y, sz.z) * 3, 5) });
+            break;
+          }
+        }
+      });
+      ec.sort((a, b) => b.intensity - a.intensity);
+      ec.forEach((c, idx) => {
+        const spotPos = c.pos.clone();
+        spotPos.y = c.boxMinY;
+        const sl = new THREE.SpotLight(c.color, c.intensity, c.distance, THREE.MathUtils.degToRad(80), 0.2);
+        sl.position.copy(spotPos);
+        sl.castShadow = !isMobile && idx < 8;
+        sl.userData.baseIntensity = c.intensity;
+        sl.target.position.set(spotPos.x, spotPos.y - 1, spotPos.z);
+        sl.shadow.mapSize.set(1024, 1024); sl.shadow.bias = -0.001; sl.shadow.normalBias = parseFloat(document.getElementById('sl-normal-bias')?.value || 0.03);
+        scene.add(sl); scene.add(sl.target);
+        emissiveLights.push(sl);
+
+        // SpotLightの50cm下にPointLight（常時ON）
+        const ptMulInit = parseFloat(document.getElementById('sl-point-mul')?.value || 0.15);
+        const pl = new THREE.PointLight(c.color, ptMulInit, c.distance * 0.8);
+        pl.position.set(spotPos.x, spotPos.y - 0.5, spotPos.z);
+        pl.castShadow = false;
+        pl.userData.baseIntensity = 0.02;
+        pl.userData.isPoint = true;
+        scene.add(pl);
+        emissiveLights.push(pl);
+
+        emissiveLightGroups.push({ sl, pl, pos3: spotPos.clone() });
+      });
+      } // end !isMobile SpotLight block
+
+      // カメラ設定
+      setLoading('カメラを設定中...', 90);
+      glbCameras = [];
+      gltf.scene.traverse(o => { if (o.isCamera) glbCameras.push(o); });
+      if (gltf.cameras) gltf.cameras.forEach(c => { if (!glbCameras.includes(c)) glbCameras.push(c); });
+      glbCameras.forEach(cam => {
+        if (cam.isPerspectiveCamera) { cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix(); }
+      });
+
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (!isMobile) {
+        Object.assign(dirLight.shadow.camera, { left: -maxDim, right: maxDim, top: maxDim, bottom: -maxDim, far: maxDim * 4 });
+        dirLight.shadow.camera.updateProjectionMatrix();
+      }
+      dirLightCenter.copy(center); dirLightDist = maxDim * 2;
+      updateLighting();
+
+      const eyeH = size.y * 0.35 + box.min.y;
+      const offset = Math.max(size.x, size.z) * 0.4;
+      walkCamera.position.set(center.x + offset, eyeH, center.z + offset);
+      walkCamera.lookAt(center); yaw = -Math.PI / 4; pitch = 0;
+
+      buildCameraList();
+      setLoading('完了', 100);
+      setTimeout(() => {
+        const ov2 = document.getElementById('loading-overlay');
+        ov2.classList.add('hidden');
+        ov2.classList.remove('visible');
+        document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
+      }, 300);
+
+      const parts = (displayUrl || url).split('/');
+      document.getElementById('model-name').textContent = decodeURIComponent(parts[parts.length - 1] || 'model.glb');
+      document.getElementById('btn-capture').disabled = false;
+      // 常にカメラ一覧の先頭を選択
+      if (glbCameras.length > 0) switchCamera(0);
+      else { activeCamera = walkCamera; activeCamIdx = -1; }
+    },
+    (prog) => {
+      if (prog.total > 0) {
+        setLoading('ダウンロード中... (' + (prog.loaded/1024/1024).toFixed(1) + 'MB)', Math.min((prog.loaded/prog.total*60)+5, 65));
+      }
+    },
+    (err) => {
+      clearSlowTimer();
+      const msg = err.message || '';
+      if (/404|not found|Object not found/i.test(msg)) {
+        showError('このウォークスルーデータは公開期限が終了したか、削除されました。');
+      } else {
+        showError('読み込みエラー: ' + msg.substring(0, 200));
+      }
+    }
+  );
+}
+
+/* ── Camera List (XSS safe: textContent使用) ── */
+function buildCameraList() {
+  const list = document.getElementById('camera-list');
+  list.innerHTML = '';
+
+  if (!glbCameras.length) {
+    const n = document.createElement('div');
+    n.style = 'padding:8px 20px;font-family:"DM Mono",monospace;font-size:10px;color:var(--muted)';
+    n.textContent = 'GLB内にカメラなし';
+    list.appendChild(n);
+  } else {
+    glbCameras.forEach((cam, i) => {
+      const item = document.createElement('div');
+      item.className = 'cam-item'; item.dataset.idx = String(i);
+      const icon = document.createElement('div'); icon.className = 'cam-icon'; icon.textContent = '📷';
+      const label = document.createElement('div'); label.className = 'cam-label';
+      label.textContent = cam.name || 'Camera ' + (i + 1); // textContent = XSS safe
+      item.appendChild(icon); item.appendChild(label);
+      item.onclick = () => switchCamera(i);
+      list.appendChild(item);
+    });
+  }
+}
+
+window.switchCamera = function (idx) {
+  activeCamIdx = -1; activeCamera = walkCamera;
+  let camName = '';
+  let camYaw = null;
+  if (idx >= 0 && glbCameras[idx]) {
+    const cam = glbCameras[idx]; camName = cam.name || '';
+    cam.updateMatrixWorld(true);
+    walkCamera.position.setFromMatrixPosition(cam.matrixWorld);
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()));
+    yaw = Math.atan2(-dir.x, -dir.z);
+    pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+    // カメラの水平方向からディレクショナルライト角度を算出（度数法）
+    camYaw = ((yaw * 180 / Math.PI + 30) % 360 + 360) % 360;
+  }
+  const isOutdoor = /外部|外構|外観/.test(camName);
+  const dv = isMobile ? 3 : (isOutdoor ? 5 : LIGHT_DEFAULTS.dir);
+  dirLight.intensity = dv;
+  document.getElementById('sl-dir').value = dv;
+  document.getElementById('sv-dir').textContent = dv.toFixed(1);
+
+  // カメラの向きに合わせて水平角を設定
+  if (camYaw !== null) {
+    document.getElementById('sl-dir-azimuth').value = Math.round(camYaw);
+    document.getElementById('sv-dir-azimuth').textContent = Math.round(camYaw) + '°';
+  }
+
+  if (isOutdoor) {
+    // 外部・外構カメラ: 画角60°、ヘミスフィア3
+    walkCamera.fov = 60; walkCamera.updateProjectionMatrix();
+    document.getElementById('sl-fov') && (document.getElementById('sl-fov').value = 60);
+    document.getElementById('sv-fov') && (document.getElementById('sv-fov').textContent = '60°');
+    hemiLight.intensity = 3;
+    document.getElementById('sl-hemi').value = 3;
+    document.getElementById('sv-hemi').textContent = '3.00';
+  } else {
+    // 通常カメラ: デフォルト値
+    walkCamera.fov = LIGHT_DEFAULTS.fov || 90; walkCamera.updateProjectionMatrix();
+    document.getElementById('sl-fov') && (document.getElementById('sl-fov').value = walkCamera.fov);
+    document.getElementById('sv-fov') && (document.getElementById('sv-fov').textContent = walkCamera.fov + '°');
+    hemiLight.intensity = LIGHT_DEFAULTS.hemi;
+    document.getElementById('sl-hemi').value = LIGHT_DEFAULTS.hemi;
+    document.getElementById('sv-hemi').textContent = LIGHT_DEFAULTS.hemi.toFixed(2);
+  }
+
+  document.getElementById('lock-msg').style.display = isMobile ? 'none' : 'block';
+  document.querySelectorAll('.cam-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+  updateLighting();
+  updateNearestLights();
+};
+
+/* ── Walk controls ── */
+let isLocked = false, yaw = 0, pitch = 0;
+const keys = {};
+const moveSpeed = isMobile ? 0.033 : 0.1;
+
+renderer.domElement.addEventListener('click', () => {
+  if (!loadedModel || isMobile || measureMode) return;
+  renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', () => {
+  isLocked = !!document.pointerLockElement;
+  document.getElementById('crosshair').style.display = isLocked ? 'block' : 'none';
+  document.getElementById('lock-msg').style.display = isLocked ? 'none' : (loadedModel ? 'block' : 'none');
+  document.body.classList.toggle('walking', isLocked);
+});
+document.addEventListener('mousemove', e => {
+  if (!isLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch - e.movementY * 0.002));
+});
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Touch controls
+let touchLookId = null, touchMoveId = null;
+let touchLookStart = { x: 0, y: 0 }, touchMoveStart = { x: 0, y: 0 };
+let touchMoveVec = { x: 0, z: 0 };
+
+renderer.domElement.addEventListener('touchstart', e => {
+  if (activeCamIdx !== -1 || !loadedModel || measureMode) return;
+  for (const t of e.changedTouches) {
+    if (t.clientX > window.innerWidth * 0.4 && touchLookId === null) {
+      touchLookId = t.identifier; touchLookStart = { x: t.clientX, y: t.clientY };
+    } else if (t.clientX <= window.innerWidth * 0.4 && touchMoveId === null) {
+      touchMoveId = t.identifier; touchMoveStart = { x: t.clientX, y: t.clientY }; touchMoveVec = { x: 0, z: 0 };
+    }
+  }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchmove', e => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchLookId) {
+      yaw -= (t.clientX - touchLookStart.x) * 0.003;
+      pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch - (t.clientY - touchLookStart.y) * 0.003));
+      touchLookStart = { x: t.clientX, y: t.clientY };
+    }
+    if (t.identifier === touchMoveId) {
+      const dx = t.clientX - touchMoveStart.x, dy = t.clientY - touchMoveStart.y;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      touchMoveVec = len > 5 ? { x: dx/len, z: dy/len } : { x: 0, z: 0 };
+    }
+  }
+}, { passive: true });
+
+function onTouchEnd(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchLookId) touchLookId = null;
+    if (t.identifier === touchMoveId) { touchMoveId = null; touchMoveVec = { x: 0, z: 0 }; }
+  }
+}
+renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: true });
+renderer.domElement.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const moveDir = new THREE.Vector3();
+
+function updateWalk() {
+  if (activeCamIdx !== -1) return;
+  euler.set(pitch, yaw, 0);
+  walkCamera.quaternion.setFromEuler(euler);
+  moveDir.set(0, 0, 0);
+  if (keys['KeyW'] || keys['ArrowUp']) moveDir.z -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) moveDir.z += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) moveDir.x -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
+  if (keys['Space']) moveDir.y += 1;
+  if (keys['ShiftLeft'] || keys['ShiftRight']) moveDir.y -= 1;
+  if (touchMoveVec.x !== 0 || touchMoveVec.z !== 0) { moveDir.x += touchMoveVec.x; moveDir.z += touchMoveVec.z; }
+  if (moveDir.length() > 0) {
+    moveDir.normalize().multiplyScalar(moveSpeed);
+    moveDir.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
+    walkCamera.position.add(moveDir);
+  }
+}
+
+/* ── Panel controls ── */
+let panelOpen = false;
+window.togglePanel = function () {
+  panelOpen = !panelOpen;
+  document.getElementById('panel-left').classList.toggle('open', panelOpen);
+  document.getElementById('panel-toggle').classList.toggle('open', panelOpen);
+  document.getElementById('panel-toggle').textContent = panelOpen ? '✕' : '☰';
+};
+window.toggleSection = function (h) { h.classList.toggle('open'); h.nextElementSibling.classList.toggle('open'); };
+
+/* ── Lighting controls ── */
+const LIGHT_DEFAULTS = {
+  exposure: 0.7, dir: 10, dirColor: '#ffffff', dirAzimuth: 45, dirElevation: 45, dirShadow: true, normalBias: 0.03,
+  amb: 0.6, ambColor: '#ffffff', hemi: 1.0, hemiSky: '#ffffff', hemiGnd: '#ffffff',
+  envmap: 0.1, emissiveMul: 0.2
+};
+let dirLightDist = 50, dirLightCenter = new THREE.Vector3();
+
+/* ── カメラから近い順に8灯ON（円形） ── */
+function updateNearestLights() {
+  if (!emissiveLightGroups.length) return;
+  const camPos = activeCamera.position;
+
+  const sorted = emissiveLightGroups.slice().sort((a, b) =>
+    a.pos3.distanceTo(camPos) - b.pos3.distanceTo(camPos)
+  );
+
+  const emMul = parseFloat(document.getElementById('sl-emissive-mul')?.value || 0.2);
+  sorted.forEach((g, i) => {
+    const on = i < 8;
+    g.sl.intensity = on ? g.sl.userData.baseIntensity * emMul : 0;
+  });
+}
+
+window.updateLighting = function () {
+  const v = id => parseFloat(document.getElementById(id).value);
+  const c = id => document.getElementById(id).value;
+  const exposure = v('sl-exposure'), dir = v('sl-dir'), dirColor = c('sl-dir-color');
+  const azimuth = v('sl-dir-azimuth'), elevation = v('sl-dir-elevation');
+  const dirShadow = document.getElementById('sl-dir-shadow').checked;
+  const normalBias = v('sl-normal-bias');
+  const amb = v('sl-amb'), ambColor = c('sl-amb-color');
+  const hemi = v('sl-hemi'), hemiSky = c('sl-hemi-sky'), hemiGnd = c('sl-hemi-gnd');
+  const env = v('sl-envmap'), emMul = v('sl-emissive-mul');
+
+  renderer.toneMappingExposure = exposure;
+  dirLight.intensity = isMobile ? 3 : dir; dirLight.color.set(dirColor);
+  dirLight.castShadow = isMobile ? false : dirShadow;
+  dirLight.shadow.normalBias = normalBias;
+  // SpotLightのnormalBiasも同期
+  emissiveLights.forEach(l => { if (l.isSpotLight && l.shadow) l.shadow.normalBias = normalBias; });
+  const az = azimuth * Math.PI / 180, el = elevation * Math.PI / 180;
+  dirLight.position.set(dirLightCenter.x + dirLightDist*Math.cos(el)*Math.sin(az), dirLightCenter.y + dirLightDist*Math.sin(el), dirLightCenter.z + dirLightDist*Math.cos(el)*Math.cos(az));
+  dirLight.target.position.copy(dirLightCenter); dirLight.target.updateMatrixWorld();
+
+  ambient.intensity = amb; ambient.color.set(ambColor);
+  hemiLight.intensity = hemi; hemiLight.color.set(hemiSky); hemiLight.groundColor.set(hemiGnd);
+
+  const emMul2 = isMobile ? 0.1 : emMul;
+  const ptMul2 = parseFloat(document.getElementById('sl-point-mul')?.value || 0.15);
+  emissiveLightGroups.forEach(g => {
+    if (g.sl.intensity > 0) g.sl.intensity = g.sl.userData.baseIntensity * emMul2;
+    g.pl.intensity = ptMul2; // 常時ON
+  });
+
+  if (loadedModel) loadedModel.traverse(o => {
+    if (!o.isMesh) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) m.envMapIntensity = env;
+    });
+  });
+
+  // UI labels
+  document.getElementById('sv-exposure').textContent = exposure.toFixed(2);
+  document.getElementById('sv-dir').textContent = dir.toFixed(1);
+  document.getElementById('sv-dir-color').textContent = dirColor.substring(0, 7);
+  document.getElementById('sv-dir-azimuth').textContent = azimuth + '°';
+  document.getElementById('sv-dir-elevation').textContent = elevation + '°';
+  document.getElementById('sv-normal-bias').textContent = normalBias.toFixed(3);
+  document.getElementById('sv-amb').textContent = amb.toFixed(2);
+  document.getElementById('sv-amb-color').textContent = ambColor.substring(0, 7);
+  document.getElementById('sv-hemi').textContent = hemi.toFixed(2);
+  document.getElementById('sv-hemi-sky').textContent = hemiSky.substring(0, 7);
+  document.getElementById('sv-hemi-gnd').textContent = hemiGnd.substring(0, 7);
+  document.getElementById('sv-envmap').textContent = env.toFixed(1);
+  document.getElementById('sv-emissive-mul').textContent = emMul.toFixed(2);
+  const ptEl = document.getElementById('sv-point-mul');
+  if (ptEl) ptEl.textContent = (parseFloat(document.getElementById('sl-point-mul')?.value || 0.02)).toFixed(3);
+};
+
+
+/* ── キャプチャ用: canvas を最大サイズに収めてbase64返却 ── */
+function resizeCanvas(srcCanvas, maxSize) {
+  return new Promise(resolve => {
+    let sw = srcCanvas.width, sh = srcCanvas.height;
+    let dw = sw, dh = sh;
+    if (sw > maxSize || sh > maxSize) {
+      const s = maxSize / Math.max(sw, sh);
+      dw = Math.round(sw * s); dh = Math.round(sh * s);
+    }
+    const c = document.createElement('canvas');
+    c.width = dw; c.height = dh;
+    c.getContext('2d').drawImage(srcCanvas, 0, 0, dw, dh);
+    resolve(c.toDataURL('image/png').split(',')[1]);
+  });
+}
+
+/* ── 全カメラ一括キャプチャ → ZIP ── */
+window.captureAllCameras = async function () {
+  if (!loadedModel) return;
+  const btn = document.getElementById('btn-capture');
+  const status = document.getElementById('capture-status');
+  btn.disabled = true;
+  status.style.display = 'block';
+
+  const W = window.innerWidth, H = window.innerHeight;
+  const SCALE = 4;
+  const CW = W * SCALE, CH = H * SCALE;
+  const zip = new JSZip();
+
+  const targets = glbCameras.map((c, i) => ({ label: c.name || ('camera_' + (i + 1)), cam: c }));
+
+  renderer.setSize(CW, CH);
+
+  for (let i = 0; i < targets.length; i++) {
+    const { label, cam } = targets[i];
+    const isOutdoor = /外部|外構|外観/.test(label);
+    const captureFov = isOutdoor ? 64 : 104;
+    status.textContent = `撮影中... ${i + 1} / ${targets.length}  [FOV:${captureFov}]`;
+
+    if (cam.isPerspectiveCamera) {
+      cam.aspect = W / H;
+      const origFov = cam.fov;
+      cam.fov = captureFov;
+      cam.updateProjectionMatrix();
+      renderer.render(scene, cam);
+      cam.fov = origFov;
+      cam.updateProjectionMatrix();
+    } else {
+      renderer.render(scene, cam);
+    }
+
+    const base64 = await resizeCanvas(renderer.domElement, 4096);
+    zip.file(label.replace(/[\/\\:*?"<>|]/g, '_') + '.png', base64, { base64: true });
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  renderer.setSize(W, H);
+  if (composer) {
+    composer.setSize(W, H);
+    if (smaaPass) smaaPass.setSize(W * renderer.getPixelRatio(), H * renderer.getPixelRatio());
+  }
+  if (composer) renderPass.camera = activeCamera;
+
+  status.textContent = 'ZIP生成中...';
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  const modelName = (document.getElementById('model-name').textContent || 'capture').replace(/\.glb$/i, '').replace(/[\/\\:*?"<>|]/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = modelName + '_cameras.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+
+  btn.disabled = false;
+  status.textContent = `✓ ${targets.length}枚 (${CW}×${CH}→4096px) を保存しました`;
+  setTimeout(() => { status.style.display = 'none'; }, 4000);
+};
+
+window.resetLighting = function () {
+  const d = LIGHT_DEFAULTS;
+  document.getElementById('sl-exposure').value = d.exposure; document.getElementById('sl-dir').value = d.dir;
+  document.getElementById('sl-dir-color').value = d.dirColor; document.getElementById('sl-dir-azimuth').value = d.dirAzimuth;
+  document.getElementById('sl-dir-elevation').value = d.dirElevation; document.getElementById('sl-dir-shadow').checked = d.dirShadow;
+  document.getElementById('sl-normal-bias').value = d.normalBias;
+  document.getElementById('sl-amb').value = d.amb; document.getElementById('sl-amb-color').value = d.ambColor;
+  document.getElementById('sl-hemi').value = d.hemi; document.getElementById('sl-hemi-sky').value = d.hemiSky;
+  document.getElementById('sl-hemi-gnd').value = d.hemiGnd; document.getElementById('sl-envmap').value = d.envmap;
+  document.getElementById('sl-emissive-mul').value = d.emissiveMul;
+  updateLighting();
+};
+
+/* ── Material property offsets ── */
+let materialOriginals = []; // { mat, roughness, metalness, emissiveIntensity, opacity }
+
+/* ── マテリアル調整（固定値: 粗さ-0.3 / 金属度+0.3 / 虹彩+0.1） ── */
+function saveMaterialOriginals() {
+  materialOriginals = [];
+  if (!loadedModel) return;
+  const seen = new Set();
+  loadedModel.traverse(o => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      if (!m || seen.has(m.uuid)) return;
+      seen.add(m.uuid);
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        materialOriginals.push({
+          mat: m,
+          roughness: m.roughness ?? 0.5,
+          metalness: m.metalness ?? 0,
+          isPhysical: !!m.isMeshPhysicalMaterial,
+          iridescence: m.iridescence ?? 0,
+        });
+      }
+    });
+  });
+}
+
+window.applyMaterialOffsets = function() {
+  materialOriginals.forEach(({ mat, roughness, metalness, isPhysical, iridescence }) => {
+    mat.roughness = Math.max(0, Math.min(1, roughness - 0.3));
+    mat.metalness = Math.max(0, Math.min(1, metalness + 0.3));
+    if (isPhysical) mat.iridescence = Math.max(0, Math.min(1, iridescence + 0.1));
+    mat.needsUpdate = true;
+  });
+};
+
+window.resetMaterialOffsets = function(apply = true) {
+  if (apply) applyMaterialOffsets();
+};
+
+/* ── Resize ── */
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  walkCamera.aspect = w / h; walkCamera.updateProjectionMatrix();
+  glbCameras.forEach(cam => { if (cam.isPerspectiveCamera) { cam.aspect = w/h; cam.updateProjectionMatrix(); } });
+  renderer.setSize(w, h);
+  if (composer) {
+    composer.setSize(w, h);
+    if (smaaPass) smaaPass.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    composer.renderTarget1?.setSize(w, h);
+    composer.renderTarget2?.setSize(w, h);
+  }
+});
+
+/* ── Measurement tool ── */
+let measureMode = false;
+let measureMarkers = [];      // THREE.Mesh[]
+let measureLine = null;       // THREE.Line
+let measureLabelEl = null;    // HTMLElement
+let measurePoints = [];       // THREE.Vector3[2]
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.toggleMeasure = function () {
+  measureMode = !measureMode;
+  document.getElementById('btn-measure').classList.toggle('active', measureMode);
+  document.getElementById('measure-hint').style.display = measureMode ? 'block' : 'none';
+  if (!measureMode) clearMeasure();
+  if (measureMode && document.pointerLockElement) document.exitPointerLock();
+};
+
+function clearMeasure() {
+  measureMarkers.forEach(m => { scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  measureMarkers = [];
+  measurePoints = [];
+  if (measureLine) { scene.remove(measureLine); measureLine.geometry.dispose(); measureLine.material.dispose(); measureLine = null; }
+  if (measureLabelEl) { measureLabelEl.remove(); measureLabelEl = null; }
+}
+
+/** 法線をワールド空間に変換し、最も近い軸(±X,±Y,±Z)にスナップ */
+function snapNormalToAxis(faceNormal, object) {
+  const worldNormal = faceNormal.clone()
+    .transformDirection(object.matrixWorld);
+
+  // 各成分の絶対値で最大軸を見つける
+  const ax = Math.abs(worldNormal.x);
+  const ay = Math.abs(worldNormal.y);
+  const az = Math.abs(worldNormal.z);
+
+  if (ay >= ax && ay >= az) {
+    // Y軸が最大 → 垂直（天井↔床）
+    return new THREE.Vector3(0, Math.sign(worldNormal.y), 0);
+  } else if (ax >= az) {
+    // X軸が最大 → 水平X方向
+    return new THREE.Vector3(Math.sign(worldNormal.x), 0, 0);
+  } else {
+    // Z軸が最大 → 水平Z方向
+    return new THREE.Vector3(0, 0, Math.sign(worldNormal.z));
+  }
+}
+
+function addMarker(point) {
+  const geo = new THREE.SphereGeometry(0.03, 12, 12);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xc8ff00, depthTest: false, transparent: true, opacity: 0.9 });
+  const marker = new THREE.Mesh(geo, mat);
+  marker.renderOrder = 999;
+  marker.position.copy(point);
+  scene.add(marker);
+  measureMarkers.push(marker);
+}
+
+function showMeasureLine(p1, p2) {
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xc8ff00, depthTest: false, transparent: true, opacity: 0.8 });
+  measureLine = new THREE.Line(lineGeo, lineMat);
+  measureLine.renderOrder = 999;
+  scene.add(measureLine);
+
+  const dist = p1.distanceTo(p2);
+  measureLabelEl = document.createElement('div');
+  measureLabelEl.className = 'measure-label';
+  measureLabelEl.textContent = dist >= 1 ? dist.toFixed(2) + ' m' : (dist * 100).toFixed(1) + ' cm';
+  document.getElementById('ui').appendChild(measureLabelEl);
+}
+
+function performMeasure(hit) {
+  clearMeasure();
+
+  const origin = hit.point.clone();
+  const normal = snapNormalToAxis(hit.face.normal, hit.object);
+
+  // 法線方向にレイを飛ばして対面を検出
+  const ray = new THREE.Raycaster(
+    origin.clone().add(normal.clone().multiplyScalar(0.005)), // 少しオフセット
+    normal,
+    0,
+    100 // 最大100m
+  );
+  const hits = ray.intersectObject(loadedModel, true);
+
+  if (hits.length > 0) {
+    // 対面ヒット → 2点間を表示
+    const target = hits[0].point;
+    measurePoints = [origin, target];
+    addMarker(origin);
+    addMarker(target);
+    showMeasureLine(origin, target);
+  } else {
+    // 対面なし → 逆方向を試す
+    const reverseNormal = normal.clone().negate();
+    const ray2 = new THREE.Raycaster(
+      origin.clone().add(reverseNormal.clone().multiplyScalar(0.005)),
+      reverseNormal,
+      0,
+      100
+    );
+    const hits2 = ray2.intersectObject(loadedModel, true);
+    if (hits2.length > 0) {
+      const target = hits2[0].point;
+      measurePoints = [origin, target];
+      addMarker(origin);
+      addMarker(target);
+      showMeasureLine(origin, target);
+    } else {
+      // どちらも当たらない → マーカーだけ表示
+      addMarker(origin);
+      measurePoints = [origin];
+    }
+  }
+}
+
+/** 計測ラベルの画面位置を毎フレーム更新 */
+function updateMeasureLabels() {
+  if (!measureLabelEl || measurePoints.length < 2) return;
+  const mid = new THREE.Vector3().addVectors(measurePoints[0], measurePoints[1]).multiplyScalar(0.5);
+  mid.project(activeCamera);
+  const x = (mid.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-mid.y * 0.5 + 0.5) * window.innerHeight;
+  measureLabelEl.style.left = x + 'px';
+  measureLabelEl.style.top = y + 'px';
+  measureLabelEl.style.display = (mid.z > 0 && mid.z < 1) ? 'block' : 'none';
+}
+
+/** 計測モード中のクリック → Raycast → 法線方向計測 */
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!measureMode || !loadedModel) return;
+  e.preventDefault();
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, activeCamera);
+  const hits = raycaster.intersectObject(loadedModel, true);
+  if (hits.length > 0 && hits[0].face) performMeasure(hits[0]);
+});
+
+/* ── Animation loop ── */
+let lastTime = 0, frameCount = 0;
+function animate(time) {
+  requestAnimationFrame(animate);
+  updateWalk();
+
+  if (composer) { renderPass.camera = activeCamera; composer.render(); }
+  else { renderer.render(scene, activeCamera); }
+  updateMeasureLabels();
+  frameCount++;
+  if (time - lastTime > 1000) {
+    document.getElementById('fps-badge').textContent = frameCount + ' fps';
+    frameCount = 0; lastTime = time;
+  }
+}
+
+/* ── Init ── */
+buildHDRPanel();
+animate(0);
+
+if (autoGlb) {
+  // ファイルサイズをHEADリクエストで取得
+  (async () => {
+    try {
+      const res = await fetch(autoGlb, { method: 'HEAD' });
+      const bytes = parseInt(res.headers.get('content-length') || '0', 10);
+      const sizeEl = document.getElementById('preload-size');
+      if (bytes > 0) {
+        const mb = bytes / 1024 / 1024;
+        sizeEl.textContent = mb >= 1000
+          ? (mb / 1024).toFixed(2) + ' GB'
+          : mb.toFixed(1) + ' MB';
+      } else {
+        sizeEl.textContent = '不明';
+      }
+    } catch (e) {
+      document.getElementById('preload-size').textContent = '不明';
+    }
+  })();
+
+  window.startWalkthrough = function () {
+    document.getElementById('preload-overlay').classList.add('hidden');
+    loadGLB(autoGlb, autoGlb);
+  };
+}
+else {
+  document.getElementById('preload-overlay').classList.add('hidden');
+  setLoading('', 0);
+  showError('アップローダーからQRコード / URLでアクセスしてください');
+}
+</script>
+</body>
+</html>

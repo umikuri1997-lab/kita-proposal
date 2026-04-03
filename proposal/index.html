@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>リフォームプラン | 喜多ハウジング</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23C4956A'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>提</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;width:100%;overflow:hidden}
+body{font-family:'Noto Sans JP','Hiragino Sans',sans-serif;-webkit-font-smoothing:antialiased;background:#FAF8F5}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#D5D0CA;border-radius:3px}
+input,textarea,button,select{font-family:inherit}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#C4956A !important}
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.anim-fu{animation:fadeUp .7s ease both}
+.anim-fi{animation:fadeIn .5s ease both}
+@media print{
+  @page{size:A3 landscape;margin:0}
+  html,body,#root{height:auto!important;width:100%!important;overflow:visible!important;background:#fff!important}
+  #root>div{height:auto!important;overflow:visible!important;max-width:none!important}
+  .no-print{display:none!important}
+  .anim-fu,.anim-fi{animation:none!important;opacity:1!important;transform:none!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .a3-page{width:420mm;min-height:297mm;padding:10mm 14mm;page-break-after:always;position:relative;overflow:hidden}
+  .a3-page:last-child{page-break-after:auto}
+}
+</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect,useCallback,useMemo}=React;
+const WU="https://kita-proposal-api.kitahousing.workers.dev";
+// 相対パス(/api/images/...)をフルURLに変換（古いデータ互換）
+const iSrc=u=>!u?"":(u.startsWith("/")?WU+u:u.startsWith("images/")?"":(u.startsWith("data:")?u:u));
+const AK="kita_reform_key";
+function getKey(){return localStorage.getItem(AK)||"";}
+function setKey(k){localStorage.setItem(AK,k);}
+async function api(path,{method="GET",body,auth=false}={}){const h={"Content-Type":"application/json"};if(auth)h["X-API-Key"]=getKey();const o={method,headers:h};if(body)o.body=JSON.stringify(body);const r=await fetch(`${WU}${path}`,o);if(r.status===401)throw new Error("認証エラー");if(!r.ok)throw new Error(`${r.status}: ${await r.text()}`);if(method==="DELETE")return null;return r.json();}
+const saveP=(id,d)=>api(`/api/proposals/${id}`,{method:"POST",body:{data:d},auth:true});
+const loadP=id=>api(`/api/proposals/${id}`,{auth:!!getKey()});
+const listP=()=>api("/api/proposals",{auth:true});
+const delP=id=>api(`/api/proposals/${id}`,{method:"DELETE",auth:true});
+async function uploadImage(b64){return(await api("/api/images",{method:"POST",body:{data:b64},auth:true})).url;}
+const EXPIRY_DAYS=365;
+const calcExpiry=d=>{if(!d)return null;const t=new Date(d);t.setDate(t.getDate()+EXPIRY_DAYS);return t.toISOString();};
+const fmtDateShort=s=>{if(!s)return"─";const d=new Date(s);return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;};
+const remainDays=s=>{if(!s)return null;return Math.ceil((new Date(s)-new Date())/864e5);};
+function collectImages(d){const u=[];if(!d)return u;if(d.coverImage)u.push(d.coverImage);(d.beforeFloors||[]).forEach(f=>{if(f.image)u.push(f.image);});(d.plans||[]).forEach(p=>{(p.floors||[]).forEach(f=>{if(f.after)u.push(f.after);});(p.rooms||[]).forEach(r=>{(r.images||[]).forEach(img=>{if(img)u.push(img);});});});return u;}
+async function delImg(url){if(!url||typeof url!=="string")return;try{const m=url.match(/\/api\/images\/(.+)/);if(m)await api(`/api/images/${m[1]}`,{method:"DELETE",auth:true});}catch(e){}}
+async function delWithImages(id,d){try{const imgs=collectImages(d);await Promise.allSettled(imgs.map(u=>delImg(u)));}catch(e){}await delP(id);}
+const THEMES={gold:{name:"ゴールド",accent:"#C4956A",accentLight:"#F5EDE5",dark:"#2C2420",darkBg:"#1A1614",secBg:"#FAF8F5",coverGrad:"linear-gradient(135deg,#1A1614,#2C2420 30%,#5A4A3E 60%,#8B7355)",tagBorder:"#E8DDD0"},sage:{name:"セージ",accent:"#A6B5A5",accentLight:"#F4EBDA",dark:"#262724",darkBg:"#1A1C1A",secBg:"#F4EBDA",coverGrad:"linear-gradient(135deg,#1A1C1A,#3A4A3A 30%,#6A7A6A 60%,#A6B5A5)",tagBorder:"#CDD8C8"},blush:{name:"ブラッシュ",accent:"#CCB3B7",accentLight:"#F2EEF0",dark:"#22292C",darkBg:"#181E22",secBg:"#E6E8F1",coverGrad:"linear-gradient(135deg,#181E22,#4A3A40 30%,#8A7078 60%,#CCB3B7)",tagBorder:"#DDD0D4"},autumn:{name:"オータム",accent:"#CD8858",accentLight:"#F5EDE5",dark:"#412E27",darkBg:"#2A1E18",secBg:"#EFE8E4",coverGrad:"linear-gradient(135deg,#2A1E18,#7A5035 30%,#CD8858 70%,#E8B888)",tagBorder:"#E0D0C0"},botanical:{name:"ボタニカル",accent:"#5F7F67",accentLight:"#EDF3EE",dark:"#2C4242",darkBg:"#1A2C2C",secBg:"#FDFDFD",coverGrad:"linear-gradient(135deg,#1A2C2C,#2C4242 30%,#5F7F67 70%,#8AAA90)",tagBorder:"#C0D8C8"}};
+function T(d){return THEMES[d?.theme]||THEMES.gold;}
+const PLAN_COLORS=["#C4956A","#6B8F71","#7E8B9A","#CD8858","#CCB3B7","#5F7F67","#8B7A9B","#9A8B7E"];
+const ICONS=["✨","🪟","💡","🍳","🚿","🔥","🌿","🎨","🛡️","❄️","👔","🌙","👟","🏠","♨️","🧹","🛏️","📦","🪴","⚡"];
+const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";let r="";for(let i=0;i<16;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
+const DATA_TYPES={multi:"プランのご提案",decided:"ご契約"};
+const fmtDate=s=>{if(!s)return"─";const d=new Date(s);return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;};
+const mkPlan=(name,desc,ci)=>({name,desc,color:PLAN_COLORS[ci%PLAN_COLORS.length],floors:[{label:"1F",after:null,markers:[]},{label:"2F",after:null,markers:[]}],rooms:[{name:"LDK",subtitle:"",images:[],points:[{icon:"✨",label:"",desc:""}]}],pricing:{items:[{label:"",amount:""}],total:""}});
+const DEFAULT={dataType:"multi",updatedAt:null,theme:"gold",customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,beforeFloors:[{label:"1F",image:null},{label:"2F",image:null}],concept:{headline:"家族の笑顔が集まる、\n心地よい空間へ。",body:"築25年の住まいに、新しい命を吹き込みます。\n3つのプランから、ご家族にぴったりのリフォームをお選びいただけます。",tags:["断熱改修","水回り刷新","間取り変更","収納計画"]},plans:[mkPlan("スタンダード","コストパフォーマンス重視プラン",0),mkPlan("ナチュラルモダン","自然素材で家族の距離を縮めるプラン",1),mkPlan("フルリノベ","間取りを一新し断熱・耐震も強化",2)],comparison:[{label:"コンセプト",values:["コスパ重視","自然素材","フル刷新"]},{label:"間取り変更",values:["─","対面キッチン","スケルトン"]},{label:"キッチン",values:["標準","中級","アイランド"]},{label:"床材",values:["フロアタイル","無垢オーク","無垢＋床暖"]},{label:"断熱",values:["─","部分","フル＋耐震3"]}],notes:"上記は概算です。現地調査後に正式見積もりをご提示いたします。"};
+
+function compressImage(file,maxPx=1920,quality=0.85){
+  return new Promise(res=>{
+    const img=new Image();const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*(maxPx/w));w=maxPx;}else{w=Math.round(w*(maxPx/h));h=maxPx;}}
+      const c=document.createElement("canvas");c.width=w;c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      const supWebP=c.toDataURL("image/webp").startsWith("data:image/webp");
+      res(supWebP?c.toDataURL("image/webp",quality):c.toDataURL("image/jpeg",quality));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);const r2=new FileReader();r2.onload=e2=>res(e2.target.result);r2.readAsDataURL(file);};
+    img.src=url;
+  });
+}
+function readAsBase64(file){return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});}
+// 選択時は圧縮のみ・保存時にR2アップロード
+async function cup(f){return await compressImage(f);}
+async function cupHQ(f){return await compressImage(f,1920,0.85);}
+// 保存時: data:URLを全収集→並列アップロード→置換
+async function uploadPendingImages(obj,onProg){
+  const b64Map=new Map();
+  (function scan(o){if(!o)return;if(typeof o==="string"&&o.startsWith("data:"))b64Map.set(o,null);else if(Array.isArray(o))o.forEach(scan);else if(typeof o==="object")Object.values(o).forEach(scan);})(obj);
+  if(!b64Map.size)return obj;
+  let done=0;const total=b64Map.size;const queue=[...b64Map.keys()];const CONCUR=3;
+  async function worker(){let item;while((item=queue.shift())!==undefined){try{b64Map.set(item,await uploadImage(item));}catch(e){b64Map.set(item,null);}done++;onProg&&onProg(done,total);}}
+  await Promise.all(Array.from({length:Math.min(CONCUR,total)},worker));
+  function replace(o){if(!o)return o;if(typeof o==="string")return b64Map.has(o)?(b64Map.get(o)||o):o;if(Array.isArray(o))return o.map(replace);if(typeof o==="object"){const r={};for(const[k,v] of Object.entries(o))r[k]=replace(v);return r;}return o;}
+  return replace(JSON.parse(JSON.stringify(obj)));
+}
+// 削除差分用: R2 URLのキーを全抽出
+function extractR2Keys(obj,keys=new Set()){
+  if(!obj)return keys;
+  if(typeof obj==="string"){const m=obj.match(/\/api\/images\/(.+)$/);if(m)keys.add(m[1]);}
+  else if(Array.isArray(obj))obj.forEach(v=>extractR2Keys(v,keys));
+  else if(typeof obj==="object")Object.values(obj).forEach(v=>extractR2Keys(v,keys));
+  return keys;
+}
+// 圧縮のみ並列
+async function compressParallel(files,onProgress){
+  const CONCUR=3;const results=new Array(files.length).fill(null);let done=0;
+  const queue=[...files.entries()];
+  async function worker(){while(queue.length){const[i,f]=queue.shift();try{results[i]=await cup(f);}catch(e){results[i]=null;}done++;onProgress&&onProgress(done,files.length);}}
+  await Promise.all(Array.from({length:Math.min(CONCUR,files.length)},worker));
+  return results;
+}
+// お客様名→ID管理（プラン用）
+function getNameIdMap(type){try{return JSON.parse(localStorage.getItem(`kita_nameid_${type}`)||"{}");}catch{return{};}}
+function setNameIdMap(type,map){try{localStorage.setItem(`kita_nameid_${type}`,JSON.stringify(map));}catch{}}
+function useImg(cb){
+  const r=useRef(null);const[prog,setProg]=useState(null);
+  const el=<input ref={r} type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;setProg("圧縮中...");try{cb(await cup(f));}catch(e2){}setProg(null);e.target.value="";}} style={{display:"none"}}/>;
+  return{go:()=>r.current?.click(),el,uploading:!!prog,prog};
+}
+function useImgHQ(cb){
+  const r=useRef(null);const[prog,setProg]=useState(null);
+  const el=<input ref={r} type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;setProg("圧縮中...");try{cb(await cupHQ(f));}catch(e2){}setProg(null);e.target.value="";}} style={{display:"none"}}/>;
+  return{go:()=>r.current?.click(),el,uploading:!!prog,prog};
+}
+function useBulkImg(onRes){
+  const r=useRef(null);const[prog,setProg]=useState(null);
+  const el=<input ref={r} type="file" accept="image/*" multiple onChange={async e=>{
+    const files=[...e.target.files||[]];if(!files.length)return;
+    setProg(`0/${files.length} 圧縮中`);
+    const b64s=await compressParallel(files,(done,total)=>setProg(`${done}/${total} 圧縮中`));
+    const res=files.map((f,i)=>b64s[i]?{label:f.name.replace(/\.[^.]+$/,"").trim()||"無題",image:b64s[i]}:null).filter(Boolean);
+    onRes(res);setProg(null);e.target.value="";
+  }} style={{display:"none"}}/>;
+  return{go:()=>r.current?.click(),el,uploading:!!prog,prog};
+}
+
+function up(sd,p,v){sd(prev=>{const n=JSON.parse(JSON.stringify(prev));const k=p.split(".");let o=n;for(let i=0;i<k.length-1;i++)o=/^\d+$/.test(k[i])?o[+k[i]]:o[k[i]];const l=k[k.length-1];o[/^\d+$/.test(l)?+l:l]=v;return n;});}
+function InView({children,delay=0}){const r=useRef(null);const[v,sV]=useState(false);useEffect(()=>{const el=r.current;if(!el)return;const o=new IntersectionObserver(([e])=>{if(e.isIntersecting){sV(true);o.disconnect();}},{threshold:.12});o.observe(el);return()=>o.disconnect();},[]);return<div ref={r} className={v?"anim-fu":""} style={{opacity:v?undefined:0,animationDelay:`${delay}ms`}}>{children}</div>;}
+function QRCode({url,size=160}){return<img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&margin=8`} alt="QR" style={{width:size,height:size,borderRadius:8,display:"block"}}/>;}
+const S={shell:{width:"100%",maxWidth:640,margin:"0 auto",height:"100%",background:"#FAF8F5",position:"relative",overflow:"hidden",display:"flex",flexDirection:"column"},fl:{fontSize:11,color:"#8B8580",fontWeight:500,marginBottom:5,letterSpacing:1},inp:{width:"100%",padding:"10px 12px",border:"1px solid #E5E0DA",borderRadius:7,fontSize:13,color:"#2C2420",background:"#fff",outline:"none",lineHeight:1.6},aB:{width:"100%",padding:"10px 0",border:"1px dashed #D5D0CA",borderRadius:7,background:"none",fontSize:11,color:"#A09890",cursor:"pointer"},xB:{background:"none",border:"none",color:"#CCC5BE",fontSize:14,cursor:"pointer",padding:4},smB:{border:"none",borderRadius:6,padding:"7px 11px",fontSize:11,fontWeight:500,cursor:"pointer",letterSpacing:1},mvB:{background:"none",border:"1px solid #E5E0DA",borderRadius:4,width:22,height:22,fontSize:10,color:"#A09890",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0},sc:{flex:1,overflowY:"auto",scrollBehavior:"smooth",WebkitOverflowScrolling:"touch",minHeight:0},bk:{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:100,background:"rgba(44,36,32,0.85)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer"},bd:{fontSize:"clamp(13px,1.5vw,15px)",lineHeight:2.4,color:"#6B6560",fontWeight:300}};
+function Fi({l,v,s,p,m,rows=2,type}){return<div style={{marginBottom:14}}><div style={S.fl}>{l}</div>{m?<textarea value={v||""} onChange={e=>s(e.target.value)} placeholder={p} rows={rows} style={{...S.inp,resize:"vertical",minHeight:rows*24}}/>:<input type={type||"text"} value={v||""} onChange={e=>s(e.target.value)} placeholder={p} style={S.inp}/>}</div>;}
+function FS({t,children}){return<div><div style={{fontSize:15,fontWeight:600,color:"#2C2420",letterSpacing:1,marginBottom:20}}>{t}</div>{children}</div>;}
+function ImgS({src,go,cl,tall,small,uploading,prog}){
+  if(uploading)return<div style={{width:"100%",height:tall?140:small?56:88,border:"1.5px dashed #C4956A",borderRadius:8,background:"rgba(196,149,106,0.04)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C4956A" strokeWidth="2" style={{animation:"pulse 1s infinite"}}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+    <span style={{fontSize:11,color:"#C4956A",fontWeight:500}}>{prog||"アップロード中..."}</span>
+  </div>;
+  if(src)return<div style={{position:"relative",marginBottom:6}}><img src={iSrc(src)} alt="" style={{width:"100%",borderRadius:8,display:"block",maxHeight:tall?220:small?100:150,objectFit:"cover"}}/><button onClick={cl} style={{position:"absolute",top:5,right:5,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:24,height:24,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>;
+  return<button onClick={go} style={{width:"100%",height:tall?140:small?56:88,border:"1.5px dashed #D5D0CA",borderRadius:8,background:"#FAFAF8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5AFA8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span style={{fontSize:11,color:"#A09890"}}>画像を選択</span></button>;}
+function MoveButtons({index,total,onMove}){return<div style={{display:"flex",flexDirection:"column",gap:2,justifyContent:"center"}}>{index>0&&<button onClick={()=>onMove(index,index-1)} style={S.mvB}>▲</button>}{index<total-1&&<button onClick={()=>onMove(index,index+1)} style={S.mvB}>▼</button>}</div>;}
+
+/* ━━━ Pin Markers ━━━ */
+function Pins({markers,rooms,color,onRemove,onPinClick}){return<>{(markers||[]).map((m,i)=>{const name=rooms[m.num-1]?.name||`${m.num}`;const clickable=!!onRemove||!!onPinClick;return<div key={i} style={{position:"absolute",left:`${m.x}%`,top:`${m.y}%`,transform:"translate(-50%,-100%)",zIndex:3,pointerEvents:clickable?"auto":"none",cursor:clickable?"pointer":"default",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.3))",transition:"transform .15s"}} onMouseEnter={e=>{if(clickable)e.currentTarget.style.transform="translate(-50%,-100%) scale(1.15)";}} onMouseLeave={e=>{e.currentTarget.style.transform="translate(-50%,-100%) scale(1)";}} onClick={e=>{e.stopPropagation();if(onRemove)onRemove(i);else if(onPinClick)onPinClick(m.num);}} title={onRemove?`${name}（クリックで削除）`:name}>
+    <svg width="32" height="40" viewBox="0 0 32 40"><path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24C32 7.2 24.8 0 16 0z" fill={color}/><circle cx="16" cy="15" r="11" fill="#fff"/><text x="16" y="19.5" textAnchor="middle" fontSize="13" fontWeight="700" fill={color} fontFamily="'Cormorant Garamond',serif">{m.num}</text></svg>
+  </div>;})}
+</>;}
+
+/* ━━━ LightBox ━━━ */
+function LightBox({src,onClose}){
+  const[sc,setSc]=useState(1);const[tx,setTx]=useState(0);const[ty,setTy]=useState(0);const ld=useRef(0);const ps=useRef(null);const sp=useRef({tx:0,ty:0});
+  const reset=()=>{setSc(1);setTx(0);setTy(0);};
+  const onTS=useCallback(e=>{if(e.touches.length===2)ld.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);else if(e.touches.length===1){ps.current={x:e.touches[0].clientX,y:e.touches[0].clientY};sp.current={tx,ty};}},[tx,ty]);
+  const onTM=useCallback(e=>{e.preventDefault();if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(ld.current>0){const ns=Math.min(Math.max(sc*(d/ld.current),1),5);setSc(ns);if(ns<=1){setTx(0);setTy(0);}}ld.current=d;}else if(e.touches.length===1&&ps.current){const dx=e.touches[0].clientX-ps.current.x,dy=e.touches[0].clientY-ps.current.y;if(sc>1){setTx(sp.current.tx+dx);setTy(sp.current.ty+dy);}}},[sc]);
+  const onTE=useCallback(()=>{ld.current=0;ps.current=null;},[]);
+  const dt=useRef(0);const tap=()=>{const n=Date.now();if(n-dt.current<300){sc>1?reset():setSc(2.5);dt.current=0;}else dt.current=n;};
+  return<div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,0.95)",display:"flex",flexDirection:"column",touchAction:"none"}} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onClick={tap}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",flexShrink:0,zIndex:2}}>
+      <button onClick={e=>{e.stopPropagation();onClose();}} style={{background:"none",border:"none",color:"#fff",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>閉じる</button>
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{sc>1?"ダブルタップでリセット":"ダブルタップで拡大"}</div>
+    </div>
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+      {src&&<img src={iSrc(src)} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",transition:sc===1?"transform 0.2s":"none",transform:`translate(${tx}px,${ty}px) scale(${sc})`,userSelect:"none",pointerEvents:"none"}}/>}
+    </div>
+  </div>;
+}
+function MarkerModal({src,markers,rooms,color,onUpdate,onClose}){
+  const ref=useRef(null);const[selNum,setSelNum]=useState(null);
+  const placedNums=new Set((markers||[]).map(m=>m.num));
+  const nextUnplaced=()=>{for(let i=1;i<=rooms.length;i++)if(!placedNums.has(i))return i;return rooms.length+1;};
+  useEffect(()=>{setSelNum(nextUnplaced());},[markers?.length]);
+  const activeNum=selNum||nextUnplaced();
+  const handleClick=e=>{const r=ref.current?.getBoundingClientRect();if(!r)return;const x=((e.clientX-r.left)/r.width)*100;const y=((e.clientY-r.top)/r.height)*100;const nm=[...(markers||[]).filter(m=>m.num!==activeNum),{x:Math.round(x*10)/10,y:Math.round(y*10)/10,num:activeNum}];onUpdate(nm);setSelNum(null);};
+  const handleRemove=idx=>{onUpdate((markers||[]).filter((_,i)=>i!==idx));};
+  return<div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.9)",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",flexShrink:0}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{fontSize:14,color:"#fff",fontWeight:500}}>ピン配置モード</div><div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>図面クリック → 配置 ／ ピンクリック → 削除</div></div>
+      <button onClick={onClose} style={{background:color,border:"none",color:"#fff",borderRadius:8,padding:"8px 20px",fontSize:12,cursor:"pointer",fontWeight:600}}>✓ 完了</button>
+    </div>
+    <div style={{padding:"0 20px 10px",flexShrink:0}}><div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginBottom:6,letterSpacing:1}}>配置する番号を選択 →　図面をクリック</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{rooms.map((rm,i)=>{const num=i+1;const placed=placedNums.has(num);const active=activeNum===num;return<button key={i} onClick={()=>setSelNum(num)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:8,cursor:"pointer",border:active?`2px solid ${color}`:placed?"2px solid rgba(255,255,255,0.15)":"2px solid rgba(255,255,255,0.08)",background:active?`${color}22`:placed?"rgba(255,255,255,0.08)":"transparent",transition:"all .15s"}}><div style={{width:20,height:20,borderRadius:"50%",background:active?color:placed?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active||placed?"#fff":"rgba(255,255,255,0.3)"}}>{num}</div><span style={{fontSize:11,color:active?"#fff":placed?"rgba(255,255,255,0.6)":"rgba(255,255,255,0.3)"}}>{rm.name||"─"}</span>{placed&&!active&&<span style={{fontSize:8,color:"rgba(255,255,255,0.3)"}}>配置済</span>}</button>;})}
+      <button onClick={()=>{onUpdate([]);}} style={{padding:"5px 12px",borderRadius:8,background:"none",border:"1px solid rgba(255,100,100,0.3)",color:"rgba(255,100,100,0.6)",fontSize:10,cursor:"pointer"}}>全削除</button>
+    </div></div>
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px 20px",overflow:"auto"}}>
+      <div ref={ref} style={{position:"relative",maxWidth:"100%",maxHeight:"100%",cursor:"crosshair",lineHeight:0}} onClick={handleClick}>
+        <img src={iSrc(src)} alt="" style={{maxWidth:"100%",maxHeight:"calc(100vh - 160px)",display:"block",borderRadius:8}}/>
+        <Pins markers={markers} rooms={rooms} color={color} onRemove={handleRemove}/>
+        <div style={{position:"absolute",top:10,right:10,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(8px)",borderRadius:6,padding:"4px 10px",fontSize:10,color:"rgba(255,255,255,0.7)",letterSpacing:1,zIndex:5}}>次: ⓝ{activeNum} {rooms[activeNum-1]?.name||""}</div>
+      </div>
+    </div>
+  </div>;
+}
+
+/* ━━━ App ━━━ */
+function App(){const[mode,setMode]=useState("loading");const[data,setData]=useState(DEFAULT);const[tab,setTab]=useState("basic");const[shareId,setShareId]=useState(null);const[err,setErr]=useState(null);const[saving,setSaving]=useState(false);const[saveProg,setSaveProg]=useState("");const lastSavedRef=useRef(null);
+  function migrate(d){if(d.plans&&!Array.isArray(d.plans)){const arr=[];for(const k of["a","b","c"])if(d.plans[k]){const p=d.plans[k];p.color=PLAN_COLORS[arr.length%PLAN_COLORS.length];arr.push(p);}d.plans=arr;}if(d.comparison?.[0]&&!Array.isArray(d.comparison[0].values))d.comparison=d.comparison.map(r=>({label:r.label,values:[r.a||"",r.b||"",r.c||""]}));if(!d.dataType)d.dataType="multi";if(!d.updatedAt)d.updatedAt=null;
+    /* migrate before from per-plan to shared */
+    if(!d.beforeFloors){const bf=[];if(d.plans){const firstPlan=(Array.isArray(d.plans)?d.plans:Object.values(d.plans))[0];if(firstPlan?.floors)firstPlan.floors.forEach(fl=>{bf.push({label:fl.label,image:fl.before||null});});}d.beforeFloors=bf.length?bf:[{label:"1F",image:null},{label:"2F",image:null}];}
+    if(d.plans){(Array.isArray(d.plans)?d.plans:Object.values(d.plans)).forEach(p=>{delete p.coverImage;if(p.floors)p.floors.forEach(fl=>{if(!fl.markers)fl.markers=[];});});}return d;}
+  useEffect(()=>{const hash=location.hash.replace("#","");const p=new URLSearchParams(location.search);if(hash&&hash.length>=4&&p.get("v")==="1"){loadP(hash).then(r=>{if(r?.data){setData(migrate(r.data));setMode("customer");}else setMode("notfound");}).catch(()=>setMode("notfound"));return;}if(getKey()){if(hash&&hash.length>=4){loadP(hash).then(r=>{if(r?.data){const d=migrate(r.data);setData(d);lastSavedRef.current=d;setShareId(hash);}setMode("edit");}).catch(()=>setMode("edit"));}else setMode("edit");}else setMode("login");},[]);
+  const hLogin=async k=>{setKey(k);try{await listP();setMode("edit");}catch(e){setKey("");throw e;}};
+  const hSave=async()=>{
+    const name=(data.customerName||"").trim();
+    let id=shareId;
+    if(!id&&name){const map=getNameIdMap("multi");id=map[name]||genId();}
+    else if(!id)id=genId();
+    setSaving(true);setSaveProg("画像をアップロード中...");
+    try{
+      let uploaded=await uploadPendingImages(data,(done,total)=>setSaveProg(`画像 ${done}/${total} アップロード中...`));
+      const now=new Date().toISOString();
+      const d2={...uploaded,dataType:"multi",updatedAt:now,expiresAt:calcExpiry(now)};
+      if(lastSavedRef.current){
+        const oldKeys=extractR2Keys(lastSavedRef.current);
+        const newKeys=extractR2Keys(d2);
+        const toDelete=[...oldKeys].filter(k=>!newKeys.has(k));
+        if(toDelete.length){setSaveProg(`不要画像 ${toDelete.length}件 削除中...`);await Promise.allSettled(toDelete.map(k=>api(`/api/images/${k}`,{method:"DELETE",auth:true})));}
+      }
+      setSaveProg("保存中...");
+      await saveP(id,d2);setData(d2);lastSavedRef.current=d2;setShareId(id);
+      if(name){const map=getNameIdMap("multi");map[name]=id;setNameIdMap("multi",map);}
+      return id;
+    }catch(e){alert("保存エラー: "+e.message);setErr(e.message);return null;}
+    finally{setSaving(false);setSaveProg("");}
+  };
+  const hLoad=async id=>{try{const r=await loadP(id);if(r?.data){const d=migrate(r.data);setData(d);lastSavedRef.current=d;setShareId(id);setMode("edit");}else{alert("データの読み込みに失敗しました");}}catch(e){alert("読み込みエラー: "+e.message);}};
+  if(mode==="loading")return<div style={{...S.shell,maxWidth:"none",alignItems:"center",justifyContent:"center"}}><p style={{color:"#A09890",fontSize:13}}>読み込み中...</p></div>;
+  if(mode==="notfound")return<div style={{...S.shell,maxWidth:"none",alignItems:"center",justifyContent:"center",padding:24}}><div style={{textAlign:"center"}}><div style={{fontSize:48,marginBottom:16,opacity:.3}}>📄</div><div style={{fontSize:16,fontWeight:500,marginBottom:8}}>データが見つかりません</div><div style={{fontSize:13,color:"#A09890"}}>URLが正しいかご確認ください</div></div></div>;
+  if(mode==="login")return<Login onDone={hLogin}/>;
+  return<>{mode==="customer"&&<div style={{...S.shell,maxWidth:"none"}}><CustomerView data={data}/></div>}{mode==="preview"&&<div style={{...S.shell,maxWidth:"none"}}><div className="no-print" style={{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:100,display:"flex",gap:8}}><button onClick={()=>setMode("edit")} style={{background:"rgba(44,36,32,0.85)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer"}}>◀ 編集</button><button onClick={()=>{setMode("printing");}} style={{background:"rgba(196,149,106,0.9)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/></svg>A3 PDF</button></div><div style={S.sc}><Preview data={data}/></div></div>}{mode==="printing"&&<PrintLayout data={data} onDone={()=>setMode("edit")}/>}{mode==="edit"&&<EditorWrap data={data} setData={setData} tab={tab} setTab={setTab} onPv={()=>setMode("preview")} onPdf={()=>setMode("printing")} sid={shareId} onSave={hSave} onLoad={hLoad} onNew={()=>{setData(JSON.parse(JSON.stringify(DEFAULT)));setShareId(null);setTab("basic");lastSavedRef.current=null;}} onList={()=>setMode("list")} err={err} setErr={setErr} onLogout={()=>{setKey("");setMode("login");}} saving={saving} saveProg={saveProg}/>}{mode==="list"&&<ListWrap onLoad={hLoad} onBack={()=>setMode("edit")}/>}
+  </>;
+}
+function PrintTrigger({onDone}){useEffect(()=>{const t=setTimeout(()=>window.print(),600);const h=()=>onDone();window.addEventListener("afterprint",h);return()=>{clearTimeout(t);window.removeEventListener("afterprint",h);};},[]);return<div className="no-print" style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:"rgba(44,36,32,0.9)",backdropFilter:"blur(12px)",color:"#fff",borderRadius:12,padding:"14px 28px",fontSize:13,fontWeight:500,display:"flex",alignItems:"center",gap:10}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4956A" strokeWidth="2" style={{animation:"pulse 1.5s infinite"}}><path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/></svg>印刷ダイアログを開いています…<button onClick={onDone} style={{background:"none",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",borderRadius:6,padding:"4px 12px",fontSize:10,cursor:"pointer",marginLeft:8}}>キャンセル</button></div>;}
+
+/* ━━━ Customer Views ━━━ */
+function CustomerView({data}){const th=T(data);const[sh,setSh]=useState(false);return<><div style={S.sc}><Preview data={data}/></div><button onClick={()=>setSh(true)} style={{position:"fixed",bottom:24,right:24,zIndex:100,width:52,height:52,borderRadius:"50%",background:th.dark,border:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.25)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>{sh&&<SharePanel onClose={()=>setSh(false)} th={th}/>}</>;}
+function SharePanel({onClose,th}){const url=location.href;const[cp,setCp]=useState(false);return<div style={{position:"fixed",inset:0,zIndex:9000,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}><div style={{background:"rgba(0,0,0,0.4)",position:"absolute",inset:0}}/><div style={{position:"relative",background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 24px 32px",maxWidth:640,margin:"0 auto",width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{width:36,height:4,borderRadius:2,background:"#E5E0DA",margin:"0 auto 20px"}}/><div style={{fontSize:15,fontWeight:600,marginBottom:20,textAlign:"center"}}>共有</div><div style={{display:"flex",justifyContent:"center",marginBottom:20}}><QRCode url={url} size={160}/></div><div style={{display:"flex",flexDirection:"column",gap:10}}>{typeof navigator.share==="function"&&<button onClick={async()=>{try{await navigator.share({title:document.title,url});}catch(e){}}} style={{width:"100%",padding:"14px 0",border:"none",borderRadius:10,fontSize:13,fontWeight:500,cursor:"pointer",background:th.dark,color:"#fff"}}>共有する</button>}<button onClick={()=>window.open(`https://line.me/R/msg/text/?${encodeURIComponent(url)}`,"_blank")} style={{width:"100%",padding:"14px 0",border:"none",borderRadius:10,fontSize:13,fontWeight:500,cursor:"pointer",background:"#06C755",color:"#fff"}}>LINEで送る</button><button onClick={async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}}} style={{width:"100%",padding:"14px 0",border:`1px solid ${th.tagBorder}`,borderRadius:10,fontSize:13,fontWeight:500,cursor:"pointer",background:"#fff",color:th.dark}}>{cp?"✓ コピーしました":"URLをコピー"}</button></div><button onClick={onClose} style={{marginTop:16,width:"100%",padding:"12px 0",background:"none",border:"none",color:"#A09890",fontSize:12,cursor:"pointer"}}>閉じる</button></div></div>;}
+
+/* ━━━ Preview shared layout ━━━ */
+function PSec({children,bg,style:st}){return<div style={{padding:"clamp(60px,10vw,100px) 6vw",background:bg,...st}}><div style={{maxWidth:900,margin:"0 auto"}}>{children}</div></div>;}
+function PLbl({en,ja,dark,center,accent}){const a=accent||"#C4956A";return<InView><div style={{marginBottom:40,textAlign:center?"center":"left"}}><div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:11,letterSpacing:8,color:dark?`${a}88`:a,textTransform:"uppercase",opacity:.7}}>{en}</div><div style={{fontSize:18,letterSpacing:5,color:dark?"rgba(255,255,255,0.85)":"#2C2420",fontWeight:300,marginTop:10}}>{ja}</div><div style={{width:32,height:2,background:a,marginTop:18,marginLeft:center?"auto":0,marginRight:center?"auto":0,borderRadius:2}}/></div></InView>;}
+
+function Preview({data}){const th=T(data);const plans=data.plans||[];const[activePlan,setActivePlan]=useState(0);const[floorIdx,setFloorIdx]=useState(()=>plans.map(()=>0));const[baMode,setBaMode]=useState(()=>plans.map(()=>"before"));const[imgIdx,setImgIdx]=useState({});const[lb,setLb]=useState(null);const plan=plans[activePlan];const pc=plan?.color||PLAN_COLORS[activePlan%PLAN_COLORS.length];if(!plan)return null;
+  const curPlanFloor=plan.floors[floorIdx[activePlan]||0];const curBA=baMode[activePlan]||"before";const isAfter=curBA==="after";
+  const curBeforeFloor=(data.beforeFloors||[]).find(bf=>bf.label===curPlanFloor?.label)||(data.beforeFloors||[])[floorIdx[activePlan]||0];
+  const floorSrc=isAfter?curPlanFloor?.after:curBeforeFloor?.image;const hasMarkers=isAfter&&(curPlanFloor?.markers||[]).length>0;
+  const scrollToRoom=num=>{const el=document.getElementById(`room-${activePlan}-${num-1}`);if(el)el.scrollIntoView({behavior:"smooth",block:"center"});};
+  return<>
+    {lb&&<LightBox src={iSrc(lb)} onClose={()=>setLb(null)}/>}
+    <div style={{minHeight:"100vh",position:"relative",display:"flex",flexDirection:"column",justifyContent:"flex-end",overflow:"hidden",background:th.coverGrad}}>
+      {data.coverImage&&<img src={iSrc(data.coverImage)} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:.3}}/>}
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.6) 100%)"}}/>
+      <div style={{position:"relative",zIndex:2,padding:"0 6vw 80px",maxWidth:900,margin:"0 auto",width:"100%"}}><h1 className="anim-fu" style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(32px,6vw,56px)",fontWeight:300,color:"#fff",lineHeight:1.3,letterSpacing:2,margin:0}}>{data.customerName?`${data.customerName} 様邸`:"○○様邸"}<br/><span style={{color:th.accent,fontSize:"clamp(24px,4vw,40px)"}}>{data.planTitle}</span></h1><div style={{width:50,height:2,background:th.accent,margin:"28px 0",borderRadius:2}}/><div style={{fontSize:11,color:"rgba(255,255,255,0.3)",letterSpacing:4}}>喜多ハウジング株式会社{data.staffName&&<span style={{marginLeft:16}}>担当：{data.staffName}</span>}</div></div>
+    </div>
+    <PSec bg="#fff"><PLbl accent={th.accent} en="Concept" ja="リフォームコンセプト"/><InView delay={100}><h2 style={{fontSize:"clamp(22px,4vw,36px)",fontWeight:300,lineHeight:2,letterSpacing:2,marginBottom:28,whiteSpace:"pre-line"}}>{data.concept.headline}</h2></InView><InView delay={200}><p style={S.bd}>{data.concept.body}</p></InView><InView delay={300}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginTop:36}}>{data.concept.tags.filter(Boolean).map(t=><div key={t} style={{padding:"16px 14px",background:"#fff",borderRadius:12,textAlign:"center",fontSize:12,fontWeight:500,letterSpacing:2,border:`1px solid ${th.tagBorder}`,boxShadow:"0 2px 12px rgba(0,0,0,0.03)"}}>{t}</div>)}</div></InView></PSec>
+    <PSec bg={th.secBg}><PLbl accent={th.accent} en="Plan Select" ja={`${plans.length}つのリフォームプラン`}/>
+      <InView><div style={{display:"flex",gap:10,marginBottom:48,justifyContent:"center",flexWrap:"wrap"}}>{plans.map((p,i)=>{const c=p.color||PLAN_COLORS[i%PLAN_COLORS.length];return<button key={i} onClick={()=>setActivePlan(i)} style={{position:"relative",padding:"16px 28px",borderRadius:14,border:activePlan===i?`2px solid ${c}`:"2px solid #E5E0DA",background:"#fff",cursor:"pointer",textAlign:"center",minWidth:120,transition:"all .25s",transform:activePlan===i?"translateY(-3px)":"none",boxShadow:activePlan===i?"0 8px 32px rgba(0,0,0,0.1)":"none"}}>{activePlan===i&&<div style={{position:"absolute",top:0,left:0,right:0,height:4,background:c}}/>}<div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:500,letterSpacing:2,color:activePlan===i?c:"#8B8580"}}>Plan {i+1}</div><div style={{fontSize:11,color:activePlan===i?c:"#A09890",letterSpacing:2,marginTop:4}}>{p.name}</div></button>;})}</div></InView>
+      <div><div style={{height:3,borderRadius:2,marginBottom:40,background:pc}}/>
+        <div style={{marginBottom:48,padding:28,background:"#fff",borderRadius:16,border:`1px solid ${th.tagBorder}`}}><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:40,height:40,borderRadius:10,background:pc,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#fff",fontWeight:600}}>{activePlan+1}</div><div><div style={{fontSize:17,fontWeight:600,letterSpacing:2}}>Plan {activePlan+1} ─ {plan.name}</div>{plan.desc&&<div style={{fontSize:12,color:"#A09890",marginTop:2}}>{plan.desc}</div>}</div></div></div>
+        <div style={{marginBottom:40}}><div style={{display:"flex",gap:6,marginBottom:20,background:th.accentLight,borderRadius:12,padding:4,maxWidth:360}}>{plan.floors.map((fl,i)=><button key={i} onClick={()=>setFloorIdx(p=>{const n=[...p];n[activePlan]=i;return n;})} style={{flex:1,padding:"12px 0",border:"none",borderRadius:9,fontSize:13,fontWeight:500,letterSpacing:2,cursor:"pointer",background:(floorIdx[activePlan]||0)===i?"#fff":"transparent",color:(floorIdx[activePlan]||0)===i?th.dark:"#A09890",transition:"all .25s"}}>{fl.label}</button>)}</div>
+          <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:24}}><div style={{display:"flex",background:"#F0EDE8",borderRadius:10,padding:3}}><button onClick={()=>setBaMode(p=>{const n=[...p];n[activePlan]="before";return n;})} style={{padding:"10px 24px",border:"none",borderRadius:8,fontSize:12,fontWeight:500,letterSpacing:2,cursor:"pointer",background:!isAfter?"#fff":"transparent",color:!isAfter?th.dark:"#A09890",transition:"all .3s"}}>BEFORE</button><button onClick={()=>setBaMode(p=>{const n=[...p];n[activePlan]="after";return n;})} style={{padding:"10px 24px",border:"none",borderRadius:8,fontSize:12,fontWeight:500,letterSpacing:2,cursor:"pointer",background:isAfter?"#fff":"transparent",color:isAfter?th.dark:"#A09890",transition:"all .3s"}}>AFTER</button></div></div>
+          <div style={{borderRadius:16,overflow:"hidden",background:th.accentLight,position:"relative",cursor:floorSrc?"pointer":"default"}} onClick={()=>{if(floorSrc)setLb(floorSrc);}}>
+            <div style={{position:"absolute",top:16,left:16,padding:"6px 14px",borderRadius:8,fontSize:11,fontWeight:600,letterSpacing:3,zIndex:4,backdropFilter:"blur(10px)",background:isAfter?"rgba(196,149,106,0.85)":"rgba(0,0,0,0.55)",color:"#fff"}}>{isAfter?"AFTER":"BEFORE"}</div>
+            {floorSrc?<><img src={iSrc(floorSrc)} alt="" style={{width:"100%",display:"block"}}/>{hasMarkers&&<Pins markers={curPlanFloor.markers} rooms={plan.rooms} color={pc} onPinClick={num=>{scrollToRoom(num);}}/>}</>:<div style={{aspectRatio:"4/3",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:"#C4B5A0"}}><span style={{fontSize:13,letterSpacing:2}}>{curPlanFloor?.label} {isAfter?"AFTER":"BEFORE"}</span></div>}
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:56,marginTop:56}}>{plan.rooms.filter(r=>r.name).map((rm,ri)=><div key={ri} id={`room-${activePlan}-${ri}`} style={{position:"relative"}}>
+          <div style={{position:"absolute",top:-12,left:-8,width:52,height:52,borderRadius:"50%",background:`linear-gradient(135deg,${pc}CC,${pc})`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600,color:"#fff",boxShadow:`0 4px 20px ${pc}44`,zIndex:2}}>{ri+1}</div>
+          <div style={{background:"#fff",borderRadius:16,border:`1px solid ${th.tagBorder}`,overflow:"hidden",position:"relative"}}><div style={{position:"absolute",top:0,left:0,right:0,height:3,background:pc}}/>
+            {(rm.images||[]).length>0&&<div style={{paddingTop:3}}><img src={iSrc(rm.images[imgIdx[`${activePlan}-${ri}`]||0]||rm.images[0])} alt="" onClick={()=>setLb(rm.images[imgIdx[`${activePlan}-${ri}`]||0]||rm.images[0])} style={{width:"100%",aspectRatio:"16/10",objectFit:"cover",display:"block",cursor:"pointer"}}/>{rm.images.length>1&&<div style={{display:"flex",gap:4,padding:4,background:"#F8F6F3"}}>{rm.images.map((img,ii)=><button key={ii} onClick={()=>setImgIdx(p=>({...p,[`${activePlan}-${ri}`]:ii}))} style={{width:68,height:48,borderRadius:6,overflow:"hidden",border:(imgIdx[`${activePlan}-${ri}`]||0)===ii?`2px solid ${pc}`:"2px solid transparent",padding:0,cursor:"pointer",flexShrink:0,background:"none"}}><img src={iSrc(img)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></button>)}</div>}</div>}
+            {(rm.points||[]).filter(p=>p.label).length>0&&<div style={{padding:24}}><div style={{fontSize:11,letterSpacing:4,fontWeight:600,color:pc,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>REFORM POINT<span style={{flex:1,height:1,background:th.tagBorder}}/></div>{(rm.points||[]).filter(p=>p.label).map((pt,pti)=><div key={pti} style={{display:"flex",gap:14,padding:"14px 0",borderBottom:pti<rm.points.filter(p=>p.label).length-1?"1px solid #F0EDE8":"none"}}><div style={{width:32,height:32,borderRadius:8,background:th.accentLight,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:14}}>{pt.icon}</div><div><div style={{fontSize:13,fontWeight:600,letterSpacing:1,marginBottom:4}}>{pt.label}</div><div style={{fontSize:12,color:"#6B6560",lineHeight:1.9,fontWeight:300}}>{pt.desc}</div></div></div>)}</div>}
+          </div>
+        </div>)}</div>
+        {plan.pricing.items.filter(i=>i.label).length>0&&<div style={{marginTop:56,background:"#fff",borderRadius:16,padding:32,border:`1px solid ${th.tagBorder}`}}><h3 style={{fontSize:16,fontWeight:600,letterSpacing:2,marginBottom:20}}>Plan {activePlan+1} 概算費用</h3>{plan.pricing.items.filter(i=>i.label).map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"14px 0",borderBottom:"1px solid #F0EDE8"}}><span style={{fontSize:13,color:"#6B6560"}}>{it.label}</span><span style={{fontSize:14,fontWeight:500,color:pc}}>{it.amount||"—"}</span></div>)}{plan.pricing.total&&<div style={{marginTop:16,padding:"20px 0 0",borderTop:`2px solid ${th.dark}`,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:13,fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:28,fontWeight:300,color:pc}}>{plan.pricing.total}</span></div>}</div>}
+      </div>
+    </PSec>
+    {plans.length>1&&<PSec bg={th.darkBg} style={{color:"#fff"}}><PLbl accent={th.accent} en="Comparison" ja="プラン比較" dark center/><InView><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:plans.length*140+120}}><thead><tr><th style={{padding:"16px 12px",textAlign:"left",fontSize:12,color:"rgba(255,255,255,0.4)",letterSpacing:2,borderBottom:"1px solid rgba(255,255,255,0.08)",fontWeight:400,width:"24%"}}></th>{plans.map((p,i)=>{const c=p.color||PLAN_COLORS[i%PLAN_COLORS.length];return<th key={i} style={{padding:"16px 12px",textAlign:"center",borderBottom:"1px solid rgba(255,255,255,0.08)"}}><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><div style={{width:28,height:28,borderRadius:7,background:c,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:13,color:"#fff",fontWeight:600}}>{i+1}</div><div style={{fontSize:13,color:c,fontWeight:600,letterSpacing:2}}>{p.name||`プラン${i+1}`}</div></div></th>;})}</tr></thead><tbody style={{fontSize:12,color:"rgba(255,255,255,0.6)"}}>{(data.comparison||[]).filter(r=>r.label).map((r,i)=><tr key={i}><td style={{padding:"14px 12px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontWeight:500,color:"rgba(255,255,255,.35)",letterSpacing:1}}>{r.label}</td>{(r.values||[]).slice(0,plans.length).map((v,vi)=><td key={vi} style={{padding:"14px 12px",borderBottom:"1px solid rgba(255,255,255,0.05)",textAlign:"center"}}>{v}</td>)}</tr>)}<tr><td style={{padding:"14px 12px",fontWeight:500,color:"rgba(255,255,255,.35)",letterSpacing:1}}>概算合計</td>{plans.map((p,i)=><td key={i} style={{padding:"14px 12px",textAlign:"center",fontSize:16,fontWeight:500,color:p.color||PLAN_COLORS[i%PLAN_COLORS.length]}}>{p.pricing?.total||"─"}</td>)}</tr></tbody></table></div></InView>{data.notes&&<div style={{marginTop:24,textAlign:"center",fontSize:11,color:"rgba(255,255,255,.2)",letterSpacing:1}}>※ {data.notes}</div>}</PSec>}
+    <div style={{textAlign:"center",padding:"60px 20px",background:th.darkBg}}>{data.expiresAt&&<div style={{fontSize:10,color:"rgba(255,255,255,0.25)",letterSpacing:1,marginBottom:16}}>閲覧期限：{fmtDateShort(data.expiresAt)}</div>}<div style={{fontSize:12,color:"rgba(255,255,255,0.2)",letterSpacing:3}}>喜多ハウジング株式会社</div><div style={{fontSize:9,color:"rgba(255,255,255,0.08)",letterSpacing:4,marginTop:24}}>© 2026 KITA HOUSING CO., LTD.</div></div>
+  </>;}
+
+/* ━━━ A3 Print Layout (Landscape) ━━━ */
+function PrintLayout({data,onDone}){
+  const th=T(data);const plans=data.plans||[];
+  const PS={
+    page:{width:"420mm",minHeight:"297mm",padding:"10mm 14mm",pageBreakAfter:"always",position:"relative",overflow:"hidden",background:"#fff",fontFamily:"'Noto Sans JP','Hiragino Sans',sans-serif"},
+    pageLast:{pageBreakAfter:"auto"},
+    hdr:{display:"flex",justifyContent:"space-between",alignItems:"center",paddingBottom:8,borderBottom:`2px solid ${th.accent}`,marginBottom:12},
+    sec:{marginBottom:14},
+    secTitle:{fontSize:8,letterSpacing:6,color:th.accent,textTransform:"uppercase",marginBottom:3},
+    secJa:{fontSize:13,letterSpacing:4,fontWeight:300,color:th.dark,marginBottom:3},
+    secLine:{width:22,height:1.5,background:th.accent,borderRadius:1,marginBottom:8},
+    card:{background:"#fff",border:`1px solid ${th.tagBorder}`,borderRadius:6,overflow:"hidden"},
+    tag:{display:"inline-block",padding:"3px 10px",borderRadius:5,fontSize:7,fontWeight:500,letterSpacing:2,border:`1px solid ${th.tagBorder}`,color:th.dark},
+    roomNum:{width:22,height:22,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0},
+    pt:{display:"flex",gap:5,padding:"3px 0",borderBottom:"1px solid #F0EDE8",fontSize:8,lineHeight:1.5},
+    ptLast:{borderBottom:"none"},
+    ptIcon:{width:16,height:16,borderRadius:3,background:th.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,flexShrink:0},
+    footer:{position:"absolute",bottom:8,left:14,right:14,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:7,color:"#CCC5BE",letterSpacing:2},
+  };
+  const Header=()=><div style={PS.hdr}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:8,letterSpacing:5,color:th.accent,fontWeight:500}}>KITA HOUSING</span><span style={{fontSize:7,color:"#D5D0CA"}}>│</span><span style={{fontSize:10,color:"#A09890",letterSpacing:2}}>{data.planTitle}</span></div><div style={{fontSize:10,fontWeight:500,color:th.dark,letterSpacing:2}}>{data.customerName?`${data.customerName} 様邸`:""}</div></div>;
+  const Footer=({page,total})=><div style={PS.footer}><span>喜多ハウジング株式会社{data.staffName?` ─ 担当：${data.staffName}`:""}</span><span>{page} / {total}</span></div>;
+  const totalPages=1+plans.length;
+
+  return<div style={{width:"100%",height:"100%",overflow:"auto",background:"#E5E0DA"}}>
+    <PrintTrigger onDone={onDone}/>
+
+    {/* ═══ PAGE 1: Cover + Concept + Overview + Comparison (landscape) ═══ */}
+    <div className="a3-page" style={PS.page}>
+      {/* Cover hero — wide landscape banner */}
+      <div style={{background:th.coverGrad,borderRadius:10,padding:"20mm 24mm",marginBottom:14,position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,background:"url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")"}}/>
+        {data.coverImage&&<img src={iSrc(data.coverImage)} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:.2}}/>}
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,transparent 40%,rgba(0,0,0,0.3))"}}/>
+        <div style={{position:"relative",zIndex:2,display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+          <div>
+            <div style={{fontSize:7,letterSpacing:6,color:th.accent,marginBottom:8}}>REFORM PLAN</div>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:32,fontWeight:300,color:"#fff",lineHeight:1.3,letterSpacing:2}}>{data.customerName?`${data.customerName} 様邸`:"○○様邸"}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",letterSpacing:4,marginTop:4,fontWeight:300}}>{data.planTitle}</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{width:36,height:1.5,background:th.accent,marginBottom:8,borderRadius:1,marginLeft:"auto"}}/>
+            <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:3}}>喜多ハウジング株式会社</div>
+            {data.staffName&&<div style={{fontSize:8,color:"rgba(255,255,255,0.25)",marginTop:2}}>担当：{data.staffName}</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* 2-column: Concept left, Overview + Comparison right */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div>
+          <div style={PS.sec}>
+            <div style={PS.secTitle}>CONCEPT</div>
+            <div style={PS.secJa}>リフォームコンセプト</div>
+            <div style={PS.secLine}/>
+            <div style={{fontSize:16,fontWeight:300,lineHeight:1.8,letterSpacing:1,marginBottom:6,whiteSpace:"pre-line",color:th.dark}}>{data.concept.headline}</div>
+            <div style={{fontSize:9,lineHeight:1.9,color:"#6B6560",fontWeight:300,marginBottom:10}}>{data.concept.body}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{data.concept.tags.filter(Boolean).map(t=><span key={t} style={PS.tag}>{t}</span>)}</div>
+          </div>
+        </div>
+        <div>
+          {/* Plan overview cards */}
+          <div style={PS.sec}>
+            <div style={PS.secTitle}>PLAN OVERVIEW</div>
+            <div style={PS.secLine}/>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {plans.map((p,i)=>{const c=p.color||PLAN_COLORS[i%PLAN_COLORS.length];return<div key={i} style={{...PS.card,borderLeft:`3px solid ${c}`,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:24,height:24,borderRadius:6,background:c,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:12,color:"#fff",fontWeight:600,flexShrink:0}}>{i+1}</div>
+                <div style={{flex:1}}><div style={{fontSize:10,fontWeight:600,letterSpacing:1}}>Plan {i+1} ─ {p.name}</div><div style={{fontSize:8,color:"#6B6560",marginTop:1}}>{p.desc}</div></div>
+                {p.pricing.total&&<div style={{fontSize:13,fontWeight:300,color:c,flexShrink:0}}>{p.pricing.total}</div>}
+              </div>;})}
+            </div>
+          </div>
+
+          {/* Comparison table */}
+          {plans.length>1&&(data.comparison||[]).filter(r=>r.label).length>0&&<div style={PS.sec}>
+            <div style={PS.secTitle}>COMPARISON</div>
+            <div style={PS.secLine}/>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:8}}>
+              <thead><tr style={{borderBottom:`1.5px solid ${th.dark}`}}>
+                <th style={{padding:"5px 6px",textAlign:"left",color:"#A09890",fontWeight:400,letterSpacing:1,width:"22%"}}></th>
+                {plans.map((p,i)=>{const c=p.color||PLAN_COLORS[i%PLAN_COLORS.length];return<th key={i} style={{padding:"5px 6px",textAlign:"center",color:c,fontWeight:600,letterSpacing:1}}>{p.name||`Plan ${i+1}`}</th>;})}
+              </tr></thead>
+              <tbody>{(data.comparison||[]).filter(r=>r.label).map((r,i)=><tr key={i} style={{borderBottom:"1px solid #F0EDE8"}}>
+                <td style={{padding:"4px 6px",color:"#A09890",fontWeight:500}}>{r.label}</td>
+                {(r.values||[]).slice(0,plans.length).map((v,vi)=><td key={vi} style={{padding:"4px 6px",textAlign:"center",color:th.dark}}>{v}</td>)}
+              </tr>)}
+              <tr style={{borderTop:`1.5px solid ${th.dark}`}}><td style={{padding:"5px 6px",fontWeight:600,color:th.dark}}>概算合計</td>{plans.map((p,i)=><td key={i} style={{padding:"5px 6px",textAlign:"center",fontSize:11,fontWeight:500,color:p.color||PLAN_COLORS[i%PLAN_COLORS.length]}}>{p.pricing?.total||"─"}</td>)}</tr>
+              </tbody>
+            </table>
+            {data.notes&&<div style={{marginTop:4,fontSize:7,color:"#B5AFA8",letterSpacing:1}}>※ {data.notes}</div>}
+          </div>}
+        </div>
+      </div>
+      <Footer page={1} total={totalPages}/>
+    </div>
+
+    {/* ═══ PAGE 2+: Per plan detail (landscape) ═══ */}
+    {plans.map((plan,pi)=>{const c=plan.color||PLAN_COLORS[pi%PLAN_COLORS.length];const rooms=plan.rooms.filter(r=>r.name);const afterFloors=plan.floors.filter(f=>f.after);
+    return<div key={pi} className="a3-page" style={{...PS.page,...(pi===plans.length-1?PS.pageLast:{})}}>
+      <Header/>
+
+      {/* Plan title bar */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,padding:"10px 14px",background:th.accentLight,borderRadius:8,borderLeft:`4px solid ${c}`}}>
+        <div style={{width:30,height:30,borderRadius:8,background:c,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:15,color:"#fff",fontWeight:600}}>{pi+1}</div>
+        <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,letterSpacing:2}}>Plan {pi+1} ─ {plan.name}</div><div style={{fontSize:8,color:"#A09890",marginTop:1}}>{plan.desc}</div></div>
+        {plan.pricing.total&&<div style={{fontSize:16,fontWeight:300,color:c,letterSpacing:1}}>{plan.pricing.total}</div>}
+      </div>
+
+      {/* Landscape 2-column: AFTER floor plans left, Room cards right */}
+      <div style={{display:"grid",gridTemplateColumns:afterFloors.length>0?"2fr 3fr":"1fr",gap:14}}>
+        {/* Left: AFTER floor plans */}
+        {afterFloors.length>0&&<div>
+          <div style={{fontSize:8,letterSpacing:4,color:c,marginBottom:6,fontWeight:600}}>AFTER PLAN</div>
+          {afterFloors.map((fl,fi)=><div key={fi} style={{marginBottom:fi<afterFloors.length-1?8:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}><span style={{fontSize:7,letterSpacing:2,color:c,fontWeight:600}}>AFTER</span><span style={{fontSize:8,color:"#B5AFA8"}}>─ {fl.label}</span></div>
+            <div style={{borderRadius:6,overflow:"hidden",border:`1px solid ${c}44`,position:"relative"}}><img src={iSrc(fl.after)} alt="" style={{width:"100%",display:"block"}}/>{(fl.markers||[]).length>0&&<Pins markers={fl.markers} rooms={rooms} color={c}/>}</div>
+          </div>)}
+        </div>}
+
+        {/* Right: Room cards grid */}
+        <div>
+          {rooms.length>0&&<>
+            <div style={{fontSize:8,letterSpacing:4,color:c,marginBottom:6,fontWeight:600}}>ROOM DETAILS</div>
+            <div style={{display:"grid",gridTemplateColumns:rooms.length===1?"1fr":"1fr 1fr",gap:6}}>
+              {rooms.map((rm,ri)=><div key={ri} style={{...PS.card,display:"flex",flexDirection:"column"}}>
+                <div style={{position:"relative"}}><div style={{position:"absolute",top:4,left:4,zIndex:1,...PS.roomNum,background:c,boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>{ri+1}</div>
+                {(rm.images||[]).length>0?<img src={iSrc(rm.images[0])} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",display:"block"}}/>:<div style={{height:6,background:c,opacity:.15}}/>}</div>
+                {(rm.points||[]).filter(p=>p.label).length>0&&<div style={{padding:"5px 8px",flex:1}}>
+                  {(rm.points||[]).filter(p=>p.label).map((pt,pti,arr)=><div key={pti} style={{...PS.pt,...(pti===arr.length-1?PS.ptLast:{})}}>
+                    <div style={PS.ptIcon}>{pt.icon}</div>
+                    <div style={{flex:1}}><div style={{fontWeight:600,marginBottom:1,fontSize:8}}>{pt.label}</div><div style={{color:"#6B6560",fontSize:7,lineHeight:1.4}}>{pt.desc}</div></div>
+                  </div>)}
+                </div>}
+              </div>)}
+            </div>
+          </>}
+        </div>
+      </div>
+
+      {/* Pricing bar at bottom */}
+      {plan.pricing.items.filter(i=>i.label).length>0&&<div style={{marginTop:10,padding:"8px 14px",background:th.accentLight,borderRadius:8,display:"flex",alignItems:"center",gap:16}}>
+        <div style={{fontSize:8,letterSpacing:3,color:c,fontWeight:600}}>PRICE</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"0 20px",flex:1}}>
+          {plan.pricing.items.filter(i=>i.label).map((it,i)=><div key={i} style={{display:"flex",gap:8,fontSize:8,padding:"2px 0"}}><span style={{color:"#6B6560"}}>{it.label}</span><span style={{fontWeight:500,color:th.dark}}>{it.amount||"─"}</span></div>)}
+        </div>
+        {plan.pricing.total&&<div style={{display:"flex",alignItems:"baseline",gap:8,flexShrink:0}}><span style={{fontSize:9,fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:16,fontWeight:300,color:c}}>{plan.pricing.total}</span></div>}
+      </div>}
+
+      <Footer page={pi+2} total={totalPages}/>
+    </div>;})}
+  </div>;
+}
+function EditorWrap(props){const th=T(props.data);const plans=props.data.plans||[];const[showSh,setShowSh]=useState(false);const[sid,setSid]=useState(props.sid);useEffect(()=>{setSid(props.sid);},[props.sid]);const shareUrl=sid?`${location.origin}${location.pathname}?v=1#${sid}`:"";const tabs=getTabs(plans);
+  useEffect(()=>{if(props.tab.startsWith("plan-")){const idx=parseInt(props.tab.split("-")[1]);if(idx>=plans.length)props.setTab("basic");}},[plans.length]);
+  return<div style={{width:"100%",height:"100%",display:"flex",background:th.accentLight}}>
+    <div style={{width:190,flexShrink:0,background:"#fff",borderRight:"1px solid #EDEAE6",display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}><div style={{padding:"16px 16px 12px"}}><div style={{fontSize:9,letterSpacing:4,color:th.accent}}>KITA HOUSING</div><div style={{fontSize:13,fontWeight:600,color:th.dark,marginTop:4}}>リフォームプラン</div><div style={{width:20,height:1.5,background:th.accent,marginTop:8,borderRadius:1}}/></div>
+      <div style={{flex:1,overflowY:"auto",padding:"4px 8px"}}>{tabs.map(t=><button key={t.id} onClick={()=>props.setTab(t.id)} style={{width:"100%",padding:"10px 12px",border:"none",borderRadius:8,marginBottom:2,textAlign:"left",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,background:props.tab===t.id?th.accentLight:"transparent",color:props.tab===t.id?th.dark:"#8B8580",fontWeight:props.tab===t.id?600:400,borderLeft:props.tab===t.id?`3px solid ${t.color||th.accent}`:"3px solid transparent"}}>{t.color&&<div style={{width:8,height:8,borderRadius:"50%",background:t.color}}/>}{t.l}</button>)}
+        <button onClick={()=>{const np=mkPlan("新規プラン","",plans.length);up(props.setData,"plans",[...plans,np]);const cmp=(props.data.comparison||[]).map(r=>({...r,values:[...(r.values||[]),"─"]}));up(props.setData,"comparison",cmp);setTimeout(()=>props.setTab(`plan-${plans.length}`),50);}} style={{width:"100%",padding:"10px 12px",border:"1px dashed #D5D0CA",borderRadius:8,marginTop:4,textAlign:"center",fontSize:11,cursor:"pointer",color:"#A09890",background:"none"}}>＋ プラン追加</button></div>
+      <div style={{padding:12,borderTop:"1px solid #EDEAE6",display:"flex",flexDirection:"column",gap:6}}><div style={{display:"flex",gap:4}}><button onClick={props.onNew} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>新規</button><button onClick={props.onList} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>一覧</button></div><div style={{display:"flex",gap:4}}><button onClick={async()=>{if(props.saving)return;const id=await props.onSave();if(id){setSid(id);setShowSh(true);}}} disabled={props.saving} style={{...S.smB,background:props.saving?"#B5AFA8":th.accent,color:"#fff",flex:1,textAlign:"center",cursor:props.saving?"default":"pointer"}}>{props.saving?(props.saveProg||"保存中..."):"保存"}</button><button onClick={props.onPv} style={{...S.smB,background:th.dark,color:"#fff",flex:1,textAlign:"center"}}>▶ プレビュー</button></div><button onClick={props.onPdf} style={{width:"100%",padding:"7px 0",border:`1px solid ${th.tagBorder}`,borderRadius:6,background:"#fff",fontSize:11,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,color:th.dark,letterSpacing:1}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={th.accent} strokeWidth="2"><path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/></svg>A3 PDF出力</button><button onClick={props.onLogout} style={{background:"none",border:"none",color:"#A09890",fontSize:10,cursor:"pointer",padding:"6px 0"}}>ログアウト</button></div></div>
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>{sid&&<div style={{padding:"10px 20px",background:"#fff",borderBottom:"1px solid #EDEAE6",display:"flex",alignItems:"center",gap:10,flexShrink:0}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:9,color:th.accent,letterSpacing:1,fontWeight:500}}>共有URL</div><div style={{fontSize:11,color:"#6B6560",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{shareUrl}</div></div><button onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);}catch(e){}}} style={{...S.smB,background:th.dark,color:"#fff",fontSize:10,padding:"5px 12px"}}>コピー</button></div>}
+      {showSh&&sid&&<ShareModal url={shareUrl} id={sid} onClose={()=>setShowSh(false)} th={th}/>}
+      {props.err&&<div style={{padding:"10px 20px",background:"#FFF0F0",fontSize:11,color:"#C44",display:"flex",justifyContent:"space-between",flexShrink:0}}><span>{props.err}</span><button onClick={()=>props.setErr(null)} style={{background:"none",border:"none",color:"#C44",cursor:"pointer"}}>✕</button></div>}
+      <div style={{flex:1,overflowY:"auto",padding:"24px 28px 40px"}}><div style={{maxWidth:640}}>
+        {props.tab==="basic"&&<EBasic d={props.data} u={(p,v)=>up(props.setData,p,v)}/>}
+        {props.tab==="concept"&&<EConcept d={props.data} u={(p,v)=>up(props.setData,p,v)}/>}
+        {props.tab==="before"&&<EBefore d={props.data} u={(p,v)=>up(props.setData,p,v)}/>}
+        {props.tab.startsWith("plan-")&&(()=>{const pi=parseInt(props.tab.split("-")[1]);return pi<plans.length?<EPlan d={props.data} sd={props.setData} pi={pi} onRemove={()=>{const np=[...plans];np.splice(pi,1);up(props.setData,"plans",np);const cmp=(props.data.comparison||[]).map(r=>{const v=[...(r.values||[])];v.splice(pi,1);return{...r,values:v};});up(props.setData,"comparison",cmp);props.setTab("basic");}}/>:null;})()}
+        {props.tab==="compare"&&<ECompare d={props.data} sd={props.setData}/>}
+      </div></div></div></div>;}
+
+function ShareModal({url,id,onClose,th}){const[cp,setCp]=useState(false);return<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}><div style={{fontSize:16,fontWeight:600,marginBottom:16}}>保存しました</div><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><QRCode url={url} size={180}/></div><div style={{background:th.accentLight,borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:16,fontWeight:600,letterSpacing:3,fontFamily:"monospace"}}>{id}</div></div><div style={{background:th.accentLight,borderRadius:8,padding:"10px 12px",marginBottom:16,wordBreak:"break-all",fontSize:10,color:"#6B6560",fontFamily:"monospace"}}>{url}</div><div style={{display:"flex",gap:8}}><button onClick={async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}}} style={{flex:1,padding:"12px 0",background:th.dark,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer"}}>{cp?"✓ コピー済み":"URLをコピー"}</button><button onClick={onClose} style={{padding:"12px 18px",background:th.accentLight,color:th.dark,border:"none",borderRadius:8,fontSize:12,cursor:"pointer"}}>閉じる</button></div></div></div>;}
+
+function EBasic({d,u}){const img=useImg(b=>u("coverImage",b));return<FS t="基本情報"><div style={{marginBottom:20}}><div style={S.fl}>テーマカラー</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{Object.entries(THEMES).map(([k,th])=><button key={k} onClick={()=>u("theme",k)} style={{padding:"8px 14px",borderRadius:8,border:d.theme===k?`2px solid ${th.accent}`:"2px solid #E5E0DA",background:d.theme===k?th.accentLight:"#fff",color:d.theme===k?th.accent:"#8B8580",fontSize:12,cursor:"pointer",fontWeight:d.theme===k?600:400,display:"flex",alignItems:"center",gap:6}}><div style={{width:16,height:16,borderRadius:"50%",background:th.accent,border:"2px solid #fff",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}/>{th.name}</button>)}</div></div><Fi l="お客様名" v={d.customerName} s={v=>u("customerName",v)} p="例：山田 太郎"/><Fi l="担当者名" v={d.staffName} s={v=>u("staffName",v)}/><Fi l="プランタイトル" v={d.planTitle} s={v=>u("planTitle",v)}/><div style={{marginTop:12}}><div style={S.fl}>メイン画像</div><ImgS src={d.coverImage} go={img.go} cl={()=>u("coverImage",null)} tall uploading={img.uploading} prog={img.prog}/>{img.el}</div></FS>;}
+function EConcept({d,u}){return<FS t="コンセプト"><Fi l="キャッチコピー" v={d.concept.headline} s={v=>u("concept.headline",v)} m rows={3}/><Fi l="説明文" v={d.concept.body} s={v=>u("concept.body",v)} m rows={5}/><div style={S.fl}>キーワード（4つ）</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{d.concept.tags.map((t,i)=><input key={i} value={t} onChange={e=>{const a=[...d.concept.tags];a[i]=e.target.value;u("concept.tags",a);}} style={S.inp}/>)}</div></FS>;}
+function EBefore({d,u}){const bf=d.beforeFloors||[];
+  return<FS t="現況図面（BEFORE）">
+    <div style={{padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",marginBottom:16}}><div style={{fontSize:12,color:"#6B6560",lineHeight:1.8}}>ここで設定したBEFORE図面は、全プランで共通して表示されます。</div></div>
+    {bf.map((fl,fi)=><BeforeFloorItem key={fi} fl={fl} fi={fi} bf={bf} u={u}/>)}
+    {bf.length<4&&<button onClick={()=>u("beforeFloors",[...bf,{label:`${bf.length+1}F`,image:null}])} style={S.aB}>＋ フロア追加</button>}
+  </FS>;}
+function BeforeFloorItem({fl,fi,bf,u}){const img=useImgHQ(b=>u(`beforeFloors.${fi}.image`,b));
+  return<div style={{marginBottom:12,padding:14,background:"#fff",borderRadius:12,border:"1px solid #EDEAE6"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:"#2C2420",color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u(`beforeFloors.${fi}.label`,e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>
+      {bf.length>1&&<button onClick={()=>u("beforeFloors",bf.filter((_,j)=>j!==fi))} style={S.xB}>✕</button>}
+    </div>
+    <ImgS src={fl.image} go={img.go} cl={()=>u(`beforeFloors.${fi}.image`,null)} tall uploading={img.uploading} prog={img.prog}/>{img.el}
+  </div>;}
+function EPlan({d,sd,pi,onRemove}){const plan=d.plans[pi];const pc=plan.color||PLAN_COLORS[pi%PLAN_COLORS.length];const u=(p,v)=>up(sd,`plans.${pi}.${p}`,v);
+  return<div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:36,height:36,borderRadius:10,background:pc,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cormorant Garamond',serif",fontSize:16,color:"#fff",fontWeight:600}}>{pi+1}</div><div style={{fontSize:17,fontWeight:600,letterSpacing:2}}>プラン {pi+1}</div></div>{d.plans.length>1&&<button onClick={()=>{if(confirm(`プラン${pi+1}を削除しますか？`))onRemove();}} style={{fontSize:11,color:"#C44",background:"none",border:"1px solid #ECC",borderRadius:6,padding:"6px 12px",cursor:"pointer"}}>このプランを削除</button>}</div>
+    <div style={{marginBottom:14}}><div style={S.fl}>プランカラー</div><div style={{display:"flex",gap:6}}>{PLAN_COLORS.map((c,ci)=><button key={ci} onClick={()=>u("color",c)} style={{width:28,height:28,borderRadius:"50%",background:c,border:pc===c?"3px solid #2C2420":"3px solid transparent",cursor:"pointer"}}/>)}</div></div>
+    <Fi l="プラン名" v={plan.name} s={v=>u("name",v)} p="例：スタンダード"/><Fi l="説明" v={plan.desc} s={v=>u("desc",v)} m rows={3}/>
+    <div style={{marginTop:28,marginBottom:20,fontSize:14,fontWeight:600,letterSpacing:1,color:pc}}>AFTER図面（提案間取り）</div>
+    {plan.floors.map((fl,fi)=><FloorEditor key={fi} fl={fl} fi={fi} pi={pi} sd={sd} pc={pc} total={plan.floors.length} rooms={plan.rooms} onRemoveFloor={idx=>{const nf=[...plan.floors];nf.splice(idx,1);u("floors",nf);}}/>)}
+    {plan.floors.length<4&&<button onClick={()=>u("floors",[...plan.floors,{label:`${plan.floors.length+1}F`,after:null,markers:[]}])} style={{...S.aB,marginBottom:20}}>＋ フロア追加</button>}
+    <div style={{marginTop:28,marginBottom:20,fontSize:14,fontWeight:600,letterSpacing:1,color:pc}}>各部屋のポイント</div>
+    {plan.rooms.map((rm,ri)=><RoomEditor key={ri} rm={rm} ri={ri} pi={pi} plan={plan} sd={sd} pc={pc}/>)}
+    <button onClick={()=>u("rooms",[...plan.rooms,{name:"",subtitle:"",images:[],points:[{icon:"✨",label:"",desc:""}]}])} style={{...S.aB,borderColor:pc,color:pc}}>＋ 部屋を追加</button>
+    <div style={{marginTop:28,marginBottom:20,fontSize:14,fontWeight:600,letterSpacing:1,color:pc}}>概算費用</div>
+    {plan.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>{const a=[...plan.pricing.items];a[i]={...a[i],label:e.target.value};u("pricing.items",a);}} style={{...S.inp,flex:1}} placeholder="項目名"/><input value={it.amount} onChange={e=>{const a=[...plan.pricing.items];a[i]={...a[i],amount:e.target.value};u("pricing.items",a);}} style={{...S.inp,width:150,textAlign:"right"}} placeholder="¥0,000,000"/><button onClick={()=>u("pricing.items",plan.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}
+    <button onClick={()=>u("pricing.items",[...plan.pricing.items,{label:"",amount:""}])} style={S.aB}>＋ 項目追加</button>
+    <div style={{marginTop:12}}><Fi l="合計（税込）" v={plan.pricing.total} s={v=>u("pricing.total",v)} p="¥13,500,000"/></div></div>;}
+function FloorEditor({fl,fi,pi,sd,pc,total,rooms,onRemoveFloor}){const u=(p,v)=>up(sd,`plans.${pi}.floors.${fi}.${p}`,v);const imgA=useImgHQ(b=>u("after",b));const[showMarker,setShowMarker]=useState(false);
+  const markerSrc=fl.after;const markerCount=(fl.markers||[]).length;
+  return<div style={{marginBottom:12,padding:14,background:"#fff",borderRadius:12,border:"1px solid #EDEAE6"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:pc,color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u("label",e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>{total>1&&<button onClick={()=>onRemoveFloor(fi)} style={S.xB}>✕</button>}</div>
+    <div style={{fontSize:10,color:pc,marginBottom:4,textAlign:"center",fontWeight:600,letterSpacing:2}}>AFTER（提案図面）</div>
+    <ImgS src={fl.after} go={imgA.go} cl={()=>u("after",null)} tall uploading={imgA.uploading} prog={imgA.prog}/>{imgA.el}
+    {markerSrc&&<button onClick={()=>setShowMarker(true)} style={{width:"100%",marginTop:8,padding:"8px 0",border:`1.5px dashed ${pc}`,borderRadius:8,background:`${pc}08`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:11,color:pc,fontWeight:500}}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={pc} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      ピン配置 {markerCount>0&&<span style={{background:pc,color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:9}}>{markerCount}個</span>}
+    </button>}
+    {showMarker&&markerSrc&&<MarkerModal src={markerSrc} markers={fl.markers||[]} rooms={rooms} color={pc} onUpdate={v=>u("markers",v)} onClose={()=>setShowMarker(false)}/>}
+  </div>;}
+function RoomEditor({rm,ri,pi,plan,sd,pc}){const u=(p,v)=>up(sd,`plans.${pi}.rooms.${ri}.${p}`,v);const bulk=useBulkImg(res=>{const imgs=[...(rm.images||[])];for(const r of res)imgs.push(r.image);u("images",imgs);});const move=(f,t)=>{const rooms=[...plan.rooms];const[it]=rooms.splice(f,1);rooms.splice(t,0,it);up(sd,`plans.${pi}.rooms`,rooms);};
+  return<div style={{marginBottom:16,padding:14,background:"#fff",borderRadius:12,border:"1px solid #EDEAE6"}}><div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}><MoveButtons index={ri} total={plan.rooms.length} onMove={move}/><div style={{width:28,height:28,borderRadius:7,background:pc,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",fontWeight:600,flexShrink:0}}>{ri+1}</div><input value={rm.name} onChange={e=>u("name",e.target.value)} style={{...S.inp,flex:1,fontWeight:600}} placeholder="部屋名"/><button onClick={()=>up(sd,`plans.${pi}.rooms`,plan.rooms.filter((_,j)=>j!==ri))} style={S.xB}>✕</button></div>
+    <div style={S.fl}>イメージ写真</div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>{(rm.images||[]).map((img,ii)=><div key={ii} style={{position:"relative",width:72,height:52,borderRadius:6,overflow:"hidden"}}><img src={iSrc(img)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/><button onClick={()=>u("images",(rm.images||[]).filter((_,j)=>j!==ii))} style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>)}<button onClick={bulk.go} disabled={bulk.uploading} style={{width:72,height:52,borderRadius:6,border:"1.5px dashed #D5D0CA",background:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#A09890"}}>{bulk.uploading?(bulk.prog||"..."):"＋"}</button>{bulk.el}</div>
+    <div style={{...S.fl,marginTop:12}}>リフォームポイント</div>{(rm.points||[]).map((pt,pti)=><div key={pti} style={{display:"flex",gap:6,marginBottom:8,alignItems:"flex-start"}}><select value={pt.icon} onChange={e=>{const pts=[...(rm.points||[])];pts[pti]={...pts[pti],icon:e.target.value};u("points",pts);}} style={{...S.inp,width:50,padding:"6px 4px",textAlign:"center",fontSize:16}}>{ICONS.map(ic=><option key={ic} value={ic}>{ic}</option>)}</select><div style={{flex:1}}><input value={pt.label} onChange={e=>{const pts=[...(rm.points||[])];pts[pti]={...pts[pti],label:e.target.value};u("points",pts);}} style={{...S.inp,marginBottom:4}} placeholder="ポイント名"/><textarea value={pt.desc} onChange={e=>{const pts=[...(rm.points||[])];pts[pti]={...pts[pti],desc:e.target.value};u("points",pts);}} style={{...S.inp,resize:"vertical",minHeight:40}} rows={2} placeholder="説明"/></div><button onClick={()=>u("points",(rm.points||[]).filter((_,j)=>j!==pti))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("points",[...(rm.points||[]),{icon:"✨",label:"",desc:""}])} style={{...S.aB,fontSize:10}}>＋ ポイント追加</button></div>;}
+function ECompare({d,sd}){const plans=d.plans||[];const rows=d.comparison||[];const u=v=>up(sd,"comparison",v);const syncRow=r=>{const v=[...(r.values||[])];while(v.length<plans.length)v.push("─");while(v.length>plans.length)v.pop();return{...r,values:v};};
+  return<FS t="プラン比較表"><div style={{display:"grid",gridTemplateColumns:`100px repeat(${plans.length},1fr) 28px`,gap:4,marginBottom:10,padding:"8px 0"}}><div style={{fontSize:10,color:"#A09890",fontWeight:600,letterSpacing:1,display:"flex",alignItems:"center"}}>項目</div>{plans.map((p,i)=><div key={i} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:p.color||PLAN_COLORS[i%PLAN_COLORS.length]}}/><span style={{fontSize:11,fontWeight:600,color:p.color||PLAN_COLORS[i%PLAN_COLORS.length]}}>{p.name||`プラン${i+1}`}</span></div>)}<div/></div>
+    {rows.map((r,i)=>{const sr=syncRow(r);return<div key={i} style={{display:"grid",gridTemplateColumns:`100px repeat(${plans.length},1fr) 28px`,gap:4,marginBottom:6}}><input value={sr.label} onChange={e=>{const a=rows.map((x,j)=>j===i?{...syncRow(x),label:e.target.value}:syncRow(x));u(a);}} style={{...S.inp,fontWeight:600,fontSize:11}} placeholder="項目"/>{sr.values.map((v,vi)=><input key={vi} value={v} onChange={e=>{const a=rows.map((x,j)=>{const s=syncRow(x);if(j===i){const nv=[...s.values];nv[vi]=e.target.value;return{...s,values:nv};}return s;});u(a);}} style={{...S.inp,fontSize:11,textAlign:"center"}} placeholder="─"/>)}<button onClick={()=>u(rows.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>;})}
+    <button onClick={()=>u([...rows,{label:"",values:plans.map(()=>"─")}])} style={S.aB}>＋ 行を追加</button><div style={{marginTop:16}}><Fi l="注記" v={d.notes} s={v=>up(sd,"notes",v)} m rows={2}/></div></FS>;}
+
+function Login({onDone}){const[k,setK]=useState("");const[t,setT]=useState(false);const[e,setE]=useState(null);return<div style={{...S.shell,alignItems:"center",justifyContent:"center",padding:24,maxWidth:"none"}}><div style={{width:"100%",maxWidth:360}}><div style={{textAlign:"center",marginBottom:40}}><div style={{fontSize:9,letterSpacing:6,color:"#A09890"}}>KITA HOUSING</div><div style={{fontSize:20,fontWeight:300,letterSpacing:2,marginTop:8}}>リフォームプラン</div><div style={{width:30,height:1,background:"#C4956A",margin:"16px auto"}}/></div><div style={{background:"#fff",borderRadius:12,padding:24}}><div style={{fontSize:14,fontWeight:600,marginBottom:16}}>スタッフログイン</div><Fi l="APIキー" v={k} s={setK} p="キーを入力" type="password"/>{e&&<div style={{padding:12,background:"#FFF0F0",borderRadius:8,fontSize:11,color:"#C44",marginBottom:12}}>{e}</div>}<button onClick={async()=>{setT(true);setE(null);try{await onDone(k);}catch(ex){setE(ex.message);}setT(false);}} disabled={!k||t} style={{width:"100%",padding:"14px 0",background:k?"#2C2420":"#E5E0DA",color:k?"#fff":"#A09890",border:"none",borderRadius:8,fontSize:13,fontWeight:500,cursor:k?"pointer":"default"}}>{t?"確認中...":"ログイン"}</button></div></div></div>;}
+
+function ListWrap({onLoad,onBack}){const[list,setList]=useState([]);const[ld,setLd]=useState(true);const[q,setQ]=useState("");const[sort,setSort]=useState("date-desc");const impRef=useRef(null);
+  useEffect(()=>{listP().then(r=>{const items=r||[];setLd(false);
+    const now=new Date().toISOString();const results=[];let done=0;
+    if(items.length===0){setList([]);return;}
+    items.forEach(it=>{loadP(it.id).then(full=>{const d=full?.data;if(!d?.dataType||d.dataType==="multi"){const exp=d?.expiresAt||calcExpiry(d?.updatedAt);if(exp&&exp<now){delWithImages(it.id,d).catch(()=>{});}else{results.push({...it,updatedAt:d?.updatedAt,expiresAt:exp,_data:d});}}}).catch(()=>{}).finally(()=>{done++;if(done===items.length||done%5===0)setList([...results]);});});
+  }).catch(()=>setLd(false));},[]);
+  const filtered=useMemo(()=>{let f=list;if(q){const lq=q.toLowerCase();f=f.filter(i=>(i.customerName||"").toLowerCase().includes(lq)||(i.planTitle||"").toLowerCase().includes(lq)||(i.id||"").toLowerCase().includes(lq));}f=[...f];if(sort==="date-desc")f.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));else if(sort==="date-asc")f.sort((a,b)=>(a.updatedAt||"").localeCompare(b.updatedAt||""));else if(sort==="name")f.sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));return f;},[list,q,sort]);
+  const handleExport=async it=>{let d=it._data;if(!d){try{const full=await loadP(it.id);d=full?.data;}catch(e){alert("データ取得失敗");return;}}const blob=new Blob([JSON.stringify({id:it.id,data:d},null,2)],{type:"application/json"});const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=`${it.customerName||"export"}_${it.id}.json`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);};
+  const handleImport=async file=>{try{const text=await file.text();const json=JSON.parse(text);const d=json.data||json;const id=genId();const now=new Date().toISOString();d.dataType="multi";d.updatedAt=now;d.expiresAt=calcExpiry(now);await saveP(id,d);onLoad(id);}catch(e){alert("インポート失敗: "+e.message);}};
+  const handleDelete=async id=>{if(!confirm("この物件を削除しますか？\n関連画像もすべて削除されます。"))return;const it=list.find(x=>x.id===id);let d=it?._data;if(!d){try{const full=await loadP(id);d=full?.data;}catch(e){}}try{await delWithImages(id,d);}catch(e){try{await delP(id);}catch(e2){}}setList(l=>l.filter(x=>x.id!==id));};
+  const handleCleanup=async()=>{
+    if(!confirm("使われていない画像をR2から削除します。\n全物件データを確認するため少し時間がかかります。"))return;
+    try{
+      const r=await api("/api/images",{auth:true});
+      const allKeys=new Set(r.keys||[]);
+      if(allKeys.size===0){alert("R2に画像がありません。");return;}
+      const usedKeys=new Set();
+      for(const it of list){
+        let d=it._data;if(!d){try{const full=await loadP(it.id);d=full?.data;}catch(e){continue;}}
+        extractR2Keys(d).forEach(k=>usedKeys.add(k));
+      }
+      const orphans=[...allKeys].filter(k=>!usedKeys.has(k));
+      if(orphans.length===0){alert("孤立した画像はありません。\n（R2: "+allKeys.size+"件 / 使用中: "+usedKeys.size+"件）");return;}
+      if(!confirm(orphans.length+"件の未使用画像を削除します。"))return;
+      await Promise.allSettled(orphans.map(k=>api("/api/images/"+k,{method:"DELETE",auth:true})));
+      alert("✓ "+orphans.length+"件の不要画像を削除しました。");
+    }catch(e){alert("クリーンアップ失敗: "+e.message);}
+  };
+  return<div style={{width:"100%",height:"100%",background:"#FAF8F5",display:"flex",flexDirection:"column"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid #EDEAE6",background:"#fff",flexShrink:0}}><button onClick={onBack} style={{background:"none",border:"none",fontSize:13,cursor:"pointer"}}>◀ 戻る</button><div style={{fontSize:14,fontWeight:600}}>物件一覧</div><button onClick={handleCleanup} title="不要画像を削除" style={{background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 8px",fontSize:10,color:"#A09890",cursor:"pointer"}}>🧹 R2整理</button></div>
+    <div style={{padding:"12px 16px",background:"#fff",borderBottom:"1px solid #EDEAE6",flexShrink:0}}>
+      <div style={{display:"flex",gap:8}}><div style={{flex:1,position:"relative"}}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="検索（名前・タイトル・ID）" style={{...S.inp,paddingLeft:32,fontSize:12}}/><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09890" strokeWidth="2" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)"}}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><select value={sort} onChange={e=>setSort(e.target.value)} style={{...S.inp,width:130,fontSize:11,padding:"8px 10px"}}><option value="date-desc">更新日↓新しい</option><option value="date-asc">更新日↑古い</option><option value="name">名前順</option></select><button onClick={()=>impRef.current?.click()} style={{...S.smB,background:"#2C2420",color:"#fff",flexShrink:0,fontSize:10,padding:"8px 12px"}}>インポート</button><input ref={impRef} type="file" accept=".json" onChange={e=>{const f=e.target.files?.[0];if(f)handleImport(f);e.target.value="";}} style={{display:"none"}}/></div></div>
+    <div style={{flex:1,overflowY:"auto",padding:16,minHeight:0}}>{ld&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>読み込み中...</div>}{!ld&&filtered.length===0&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>{q?"該当なし":"データなし"}</div>}{filtered.map(it=>{const rd=remainDays(it.expiresAt);return<div key={it.id} style={{padding:14,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",marginBottom:8,display:"flex",alignItems:"center",gap:12,maxWidth:700}}><div style={{width:4,height:40,borderRadius:2,background:"#C4956A",flexShrink:0}}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,fontWeight:500}}>{it.customerName||"未設定"} 様</span></div><div style={{fontSize:11,color:"#A09890",marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}><span>{it.planTitle}</span><span style={{fontFamily:"monospace",fontSize:10}}>#{it.id}</span><span style={{fontSize:10,color:"#B5AFA8"}}>{fmtDate(it.updatedAt)}</span>{rd!=null&&<span style={{fontSize:9,color:rd<30?"#C44":"#A09890",fontWeight:rd<30?600:400}}>期限 {fmtDateShort(it.expiresAt)}（残{rd}日）</span>}</div></div><button onClick={()=>handleExport(it)} title="エクスポート" style={{background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"6px 8px",cursor:"pointer",flexShrink:0}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09890" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><button onClick={()=>onLoad(it.id)} style={{background:"#2C2420",color:"#fff",border:"none",borderRadius:6,padding:"8px 14px",fontSize:11,cursor:"pointer",flexShrink:0}}>開く</button><button onClick={()=>handleDelete(it.id)} style={{background:"none",border:"none",color:"#CCC5BE",fontSize:16,cursor:"pointer",flexShrink:0}}>✕</button></div>;})}</div></div>;}
+
+const getTabs=(plans)=>[{id:"basic",l:"基本"},{id:"concept",l:"コンセプト"},{id:"before",l:"現況図面"},...plans.map((_,i)=>({id:`plan-${i}`,l:`プラン${i+1}`,color:plans[i]?.color||PLAN_COLORS[i%PLAN_COLORS.length]})),{id:"compare",l:"比較表"}];
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

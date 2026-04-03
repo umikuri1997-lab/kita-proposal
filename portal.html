@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喜多ハウジング | ツール</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #F5F3F0; color: #2C2420; min-height: 100vh; }
+
+header {
+  background: #2C2420;
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+header .logo { font-size: 13px; letter-spacing: 3px; color: #C4956A; font-weight: 400; }
+header .title { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.7); }
+
+main { padding: 32px 24px; max-width: 800px; margin: 0 auto; }
+
+h2 { font-size: 11px; letter-spacing: 3px; color: #A09890; font-weight: 400; margin-bottom: 12px; margin-top: 32px; }
+h2:first-child { margin-top: 0; }
+
+.tools { display: flex; flex-direction: column; gap: 8px; }
+
+.tool {
+  background: #fff;
+  border: 1px solid #E5E0DA;
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tool:hover { border-color: #C4956A; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+
+.tool-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 20px;
+}
+
+.tool-info { flex: 1; min-width: 0; }
+.tool-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.tool-desc { font-size: 12px; color: #8B8580; line-height: 1.6; }
+
+.tool-badge {
+  font-size: 10px; font-weight: 500; padding: 3px 10px;
+  border-radius: 100px; flex-shrink: 0; letter-spacing: 1px;
+}
+.badge-local { background: #F5EDE5; color: #C4956A; border: 1px solid #E8D5C0; }
+.badge-web   { background: #EDF3EE; color: #5F7F67; border: 1px solid #C0D8C8; }
+
+.tool-arrow { color: #C5BFB8; font-size: 18px; flex-shrink: 0; }
+
+.note {
+  margin-top: 32px;
+  padding: 14px 18px;
+  background: #fff;
+  border: 1px solid #E5E0DA;
+  border-left: 3px solid #C4956A;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #8B8580;
+  line-height: 1.9;
+}
+.note strong { color: #2C2420; font-weight: 600; }
+
+footer {
+  text-align: center;
+  padding: 40px 24px;
+  font-size: 11px;
+  color: #C5BFB8;
+  letter-spacing: 2px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">KITA HOUSING</span>
+  <span style="color:rgba(255,255,255,0.2)">|</span>
+  <span class="title">提案ツール</span>
+</header>
+
+<main>
+
+  <h2>提案書ツール</h2>
+  <div class="tools">
+
+    <a href="./proposal/reform-editor_v2.html" class="tool">
+      <div class="tool-icon" style="background:#F5EDE5;">📋</div>
+      <div class="tool-info">
+        <div class="tool-name">リフォームプラン提案書</div>
+        <div class="tool-desc">複数プランの比較・間取り図・A3 PDF出力 / お客様共有URL発行</div>
+      </div>
+      <span class="tool-badge badge-local">ローカル</span>
+      <span class="tool-arrow">›</span>
+    </a>
+
+    <a href="./contract/index_v2.html" class="tool">
+      <div class="tool-icon" style="background:#EDF3EE;">📄</div>
+      <div class="tool-info">
+        <div class="tool-name">ご契約提案書</div>
+        <div class="tool-desc">外観・内装・B/A・資金計画・仕様を一括管理 / お客様共有URL発行</div>
+      </div>
+      <span class="tool-badge badge-web">Web</span>
+      <span class="tool-arrow">›</span>
+    </a>
+
+  </div>
+
+  <h2>3D・ビューア</h2>
+  <div class="tools">
+
+    <a href="./walkthrough/index.html" class="tool">
+      <div class="tool-icon" style="background:#E6E8F1;">🏠</div>
+      <div class="tool-info">
+        <div class="tool-name">3D ウォークスルー</div>
+        <div class="tool-desc">GLBファイルをアップロードしてリアルタイム3Dビューア表示</div>
+      </div>
+      <span class="tool-badge badge-web">Web</span>
+      <span class="tool-arrow">›</span>
+    </a>
+
+  </div>
+
+  <div class="note">
+    <strong>ローカル</strong> … HTMLファイルをダウンロードしてブラウザで開いて使用<br>
+    <strong>Web</strong> … GitHub Pages でホストされているためURLで直接アクセス可能<br>
+    画像データ・物件データはすべて <strong>Cloudflare</strong> に保存されます（共通）
+  </div>
+
+</main>
+
+<footer>喜多ハウジング株式会社 技術支援部</footer>
+
+</body>
+</html>

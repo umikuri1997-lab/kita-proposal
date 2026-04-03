@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ご契約提案書 | 喜多ハウジング</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236B8F71'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>契</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;width:100%;overflow:hidden}
+body{font-family:'Noto Sans JP','Hiragino Sans',sans-serif;-webkit-font-smoothing:antialiased;background:#FAF8F5}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#D5D0CA;border-radius:3px}
+input,textarea,button,select{font-family:inherit}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#C4956A !important}
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.anim-fu{animation:fadeUp .7s ease both}
+.anim-fi{animation:fadeIn .5s ease both}
+</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect,useCallback,useMemo}=React;
+const WU="https://kita-proposal-api.kitahousing.workers.dev";
+const iSrc=u=>!u?"":(u.startsWith("/")?WU+u:u.startsWith("images/")||u.startsWith("data:")?u.startsWith("data:")?u:"":u);
+const AK="kita_reform_key";
+const EXPIRY_DAYS=365;
+function getKey(){return localStorage.getItem(AK)||"";}
+function setKey(k){localStorage.setItem(AK,k);}
+async function api(path,{method="GET",body,auth=false}={}){
+  const h={"Content-Type":"application/json"};if(auth)h["X-API-Key"]=getKey();
+  const o={method,headers:h};if(body)o.body=JSON.stringify(body);
+  const r=await fetch(`${WU}${path}`,o);
+  if(r.status===401)throw new Error("認証エラー");
+  if(!r.ok)throw new Error(`${r.status}: ${await r.text()}`);
+  if(method==="DELETE")return null;return r.json();
+}
+const saveP=(id,d)=>api(`/api/proposals/${id}`,{method:"POST",body:{data:d},auth:true});
+const loadP=id=>api(`/api/proposals/${id}`,{auth:!!getKey()});
+const listP=()=>api("/api/proposals",{auth:true});
+const delP=id=>api(`/api/proposals/${id}`,{method:"DELETE",auth:true});
+async function uploadImage(b64){return(await api("/api/images",{method:"POST",body:{data:b64},auth:true})).url;}
+const calcExpiry=d=>{if(!d)return null;const t=new Date(d);t.setDate(t.getDate()+EXPIRY_DAYS);return t.toISOString();};
+const fmtDate=s=>{if(!s)return"─";const d=new Date(s);return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;};
+const fmtDateShort=s=>{if(!s)return"─";const d=new Date(s);return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;};
+const remainDays=s=>{if(!s)return null;return Math.ceil((new Date(s)-new Date())/864e5);};
+function collectImages(d){const u=[];if(!d)return u;if(d.coverImage)u.push(d.coverImage);(d.plan?.floors||[]).forEach(f=>{if(f.image)u.push(f.image);});(d.exterior?.views||[]).forEach(v=>{if(v.image)u.push(v.image);});(d.interior?.views||[]).forEach(v=>{if(v.image)u.push(v.image);});(d.beforeAfter?.pairs||[]).forEach(p=>{if(p.before)u.push(p.before);if(p.after)u.push(p.after);});return u;}
+async function delImg(url){if(!url||typeof url!=="string")return;try{const m=url.match(/\/api\/images\/(.+)/);if(m)await api(`/api/images/${m[1]}`,{method:"DELETE",auth:true});}catch(e){}}
+async function delWithImages(id,d){try{const imgs=collectImages(d);await Promise.allSettled(imgs.map(u=>delImg(u)));}catch(e){}await delP(id);}
+
+/* ━━━ テーマ（差別化強化） ━━━ */
+const THEMES={
+  gold:{name:"ゴールド",accent:"#C4956A",accentLight:"#F5EDE5",dark:"#2C2420",darkBg:"#1A1614",secBg:"#FAF8F5",coverGrad:"linear-gradient(135deg, #8B7355, #A0896D 30%, #6B8F71 60%, #C4B5A0)",tagBorder:"#E8DDD0"},
+  sage:{name:"セージ",accent:"#A6B5A5",accentLight:"#F4EBDA",dark:"#262724",darkBg:"#1A1C1A",secBg:"#F4EBDA",coverGrad:"linear-gradient(135deg, #3A4A3A 0%, #6A7A6A 30%, #A6B5A5 70%, #D0DBCC 100%)",tagBorder:"#CDD8C8"},
+  blush:{name:"ブラッシュ",accent:"#CCB3B7",accentLight:"#F2EEF0",dark:"#22292C",darkBg:"#181E22",secBg:"#E6E8F1",coverGrad:"linear-gradient(135deg, #22292C 0%, #4A3A40 30%, #8A7078 60%, #CCB3B7 100%)",tagBorder:"#DDD0D4"},
+  autumn:{name:"オータム",accent:"#CD8858",accentLight:"#F5EDE5",dark:"#412E27",darkBg:"#2A1E18",secBg:"#EFE8E4",coverGrad:"linear-gradient(135deg, #412E27 0%, #7A5035 30%, #CD8858 70%, #E8B888 100%)",tagBorder:"#E0D0C0"},
+  natural:{name:"ナチュラル",accent:"#D6BDA5",accentLight:"#FFFEF9",dark:"#6C6059",darkBg:"#3A3430",secBg:"#FFFEF9",coverGrad:"linear-gradient(135deg, #6C6059 0%, #9A8A78 30%, #D6BDA5 70%, #F0E4D8 100%)",tagBorder:"#E8DDD0"},
+  botanical:{name:"ボタニカル",accent:"#5F7F67",accentLight:"#EDF3EE",dark:"#2C4242",darkBg:"#1A2C2C",secBg:"#FDFDFD",coverGrad:"linear-gradient(135deg, #1A2C2C 0%, #2C4242 30%, #5F7F67 70%, #8AAA90 100%)",tagBorder:"#C0D8C8"},
+};
+function T(d){return THEMES[d?.theme]||THEMES.gold;}
+
+const GR=["#A0896D,#C4B5A0","#6B8F71,#8BA893","#7E8B9A,#9AABB8","#9A8B7E,#B8A99A","#8B7A9B,#A899B8"];
+const genId=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";let r="";for(let i=0;i<16;i++)r+=c[Math.floor(Math.random()*c.length)];return r;};
+const DEFAULT={dataType:"decided",updatedAt:null,expiresAt:null,theme:"gold",customerName:"",staffName:"",planTitle:"改築工事",coverImage:null,concept:{headline:"家族が、\nつながる暮らし。",body:"リビングを中心に、家族の気配が自然と感じられる間取り設計。開放的な吹き抜けと大きな窓から光が差し込み、四季の移ろいを楽しめる住まいをご提案いたします。",tags:["開放感","採光","回遊動線","省エネ"]},plan:{area:"",tsubo:"",floors:[{label:"1F",image:null},{label:"2F",image:null}]},exterior:{description:"",views:[]},interior:{description:"",views:[]},beforeAfter:{show:true,pairs:[]},viewer3dUrl:"",specs:[{category:"構造",value:"木造軸組工法"},{category:"基礎",value:"ベタ基礎"},{category:"断熱",value:"吹付け断熱"},{category:"窓",value:"Low-E複層ガラス"},{category:"換気",value:"第1種換気（熱交換型）"},{category:"耐震",value:"耐震等級3"}],pricing:{show:true,items:[{label:"建物本体",amount:""},{label:"付帯工事",amount:""},{label:"外構工事",amount:""},{label:"諸費用",amount:""}],total:"",notes:"上記は概算見積もりです。土地代は含まれておりません。"},contact:{phone:"076-000-0000",hours:"受付時間 9:00 - 18:00（水曜定休）",address:"石川県○○市○○町0-0-0"}};
+function fileToLabel(fn){let n=fn.replace(/\.[^.]+$/,"");for(const p of["パース図-","パース図_","パース-","パース_","パース図 "])if(n.startsWith(p)){n=n.slice(p.length);break;}return n.trim()||"無題";}
+function compressImage(file,maxPx=1920,quality=0.85){
+  return new Promise(res=>{
+    const img=new Image();const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*(maxPx/w));w=maxPx;}else{w=Math.round(w*(maxPx/h));h=maxPx;}}
+      const c=document.createElement("canvas");c.width=w;c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      const supWebP=c.toDataURL("image/webp").startsWith("data:image/webp");
+      res(supWebP?c.toDataURL("image/webp",quality):c.toDataURL("image/jpeg",quality));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);const r2=new FileReader();r2.onload=e2=>res(e2.target.result);r2.readAsDataURL(file);};
+    img.src=url;
+  });
+}
+function readAsBase64(file){return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});}
+// ── 保存時アップロード方式 ──
+// 選択時は base64 をそのまま state に入れる（img src="data:..." で表示可）
+// 保存ボタンで uploadPendingImages() が全 data: URL を R2 にアップロード
+
+async function compressToB64(f){return await compressImage(f);}
+
+async function uploadPendingImages(data,onProgress){
+  // data: URL を全部収集
+  const b64Map=new Map(); // b64 → null (未アップロード)
+  (function collect(obj){
+    if(!obj)return;
+    if(typeof obj==="string"&&obj.startsWith("data:"))b64Map.set(obj,null);
+    else if(Array.isArray(obj))obj.forEach(collect);
+    else if(typeof obj==="object")Object.values(obj).forEach(collect);
+  })(data);
+  if(b64Map.size===0)return data;
+  // 並列アップロード（最大3）
+  let done=0;const total=b64Map.size;
+  const entries=[...b64Map.keys()];
+  const CONCUR=3;const queue=[...entries.entries()];
+  async function worker(){
+    while(queue.length){
+      const[i,b64]=queue.shift();
+      try{b64Map.set(b64,await uploadImage(b64));}catch(e){b64Map.set(b64,null);}
+      done++;onProgress&&onProgress(done,total);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(CONCUR,entries.length)},worker));
+  // data: URL を R2 URL で置換
+  function replace(obj){
+    if(!obj)return obj;
+    if(typeof obj==="string")return b64Map.has(obj)?(b64Map.get(obj)||obj):obj;
+    if(Array.isArray(obj))return obj.map(replace);
+    if(typeof obj==="object"){const r={};for(const[k,v] of Object.entries(obj))r[k]=replace(v);return r;}
+    return obj;
+  }
+  return replace(data);
+}
+
+// R2 URL のキー部分を全て抽出（削除差分計算用）
+function extractR2Keys(obj,keys=new Set()){
+  if(!obj)return keys;
+  if(typeof obj==="string"){const m=obj.match(/\/api\/images\/(.+)$/);if(m)keys.add(m[1]);}
+  else if(Array.isArray(obj))obj.forEach(v=>extractR2Keys(v,keys));
+  else if(typeof obj==="object")Object.values(obj).forEach(v=>extractR2Keys(v,keys));
+  return keys;
+}
+
+// 同一顧客名→同一ID（localStorage で管理）
+function getNameIdMap(type){try{return JSON.parse(localStorage.getItem(`kita_nameid_${type}`)||"{}");}catch{return {};}}
+function setNameIdMap(type,map){try{localStorage.setItem(`kita_nameid_${type}`,JSON.stringify(map));}catch{}}
+
+async function compressParallel(files,onProgress){
+  const CONCUR=3;const results=new Array(files.length).fill(null);let done=0;
+  const queue=[...files.entries()];
+  async function worker(){while(queue.length){const[i,f]=queue.shift();try{results[i]=await compressToB64(f);}catch(e){results[i]=null;}done++;onProgress&&onProgress(done,files.length);}}
+  await Promise.all(Array.from({length:Math.min(CONCUR,files.length)},worker));
+  return results;
+}
+
+function useImg(cb){
+  const r=useRef(null);const[prog,setProg]=useState(null);
+  const el=<input ref={r} type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;setProg("圧縮中...");try{cb(await compressToB64(f));}catch(e2){}setProg(null);e.target.value="";}} style={{display:"none"}}/>;
+  return{go:()=>r.current?.click(),el,uploading:!!prog,prog};
+}
+function useBulkImg(onRes){
+  const r=useRef(null);const[prog,setProg]=useState(null);
+  const el=<input ref={r} type="file" accept="image/*" multiple onChange={async e=>{
+    const files=[...e.target.files||[]];if(!files.length)return;
+    setProg(`0/${files.length} 圧縮中`);
+    const b64s=await compressParallel(files,(done,total)=>setProg(`${done}/${total} 圧縮中`));
+    const res=files.map((f,i)=>b64s[i]?{label:fileToLabel(f.name),image:b64s[i]}:null).filter(Boolean);
+    onRes(res);setProg(null);e.target.value="";
+  }} style={{display:"none"}}/>;
+  return{go:()=>r.current?.click(),el,uploading:!!prog,prog};
+}
+
+function up(sd,p,v){sd(prev=>{const n=JSON.parse(JSON.stringify(prev));const k=p.split(".");let o=n;for(let i=0;i<k.length-1;i++)o=/^\d+$/.test(k[i])?o[+k[i]]:o[k[i]];const l=k[k.length-1];o[/^\d+$/.test(l)?+l:l]=v;return n;});}
+function InView({children,delay=0}){const r=useRef(null);const[v,sV]=useState(false);useEffect(()=>{const el=r.current;if(!el)return;const o=new IntersectionObserver(([e])=>{if(e.isIntersecting){sV(true);o.disconnect();}},{threshold:0.12});o.observe(el);return()=>o.disconnect();},[]);return<div ref={r} className={v?"anim-fu":""} style={{opacity:v?undefined:0,animationDelay:`${delay}ms`}}>{children}</div>;}
+function Sh({children,full}){return<div style={{...S.shell,maxWidth:full?"none":"640px"}}>{children}</div>;}
+function PSec({children,bg,last}){return<div style={{padding:last?"80px 5vw 90px":"80px 5vw",background:bg}}><div style={{maxWidth:800,margin:"0 auto"}}>{children}</div></div>;}
+function Lb({en,ja,dark,center,th}){const a=th?.accent||"#C4956A";return<InView><div style={{marginBottom:28,textAlign:center?"center":"left"}}><div style={{fontSize:9,letterSpacing:7,color:dark?`${a}88`:"#B5AFA8",textTransform:"uppercase"}}>{en}</div><div style={{fontSize:16,letterSpacing:4,color:dark?"rgba(255,255,255,0.85)":"#2C2420",fontWeight:300,marginTop:8}}>{ja}</div><div style={{width:28,height:1.5,background:dark?`${a}99`:a,marginTop:16,marginLeft:center?"auto":0,marginRight:center?"auto":0,borderRadius:1}}/></div></InView>;}
+function FS({t,children}){return<div><div style={{fontSize:15,fontWeight:600,color:"#2C2420",letterSpacing:1,marginBottom:20}}>{t}</div>{children}</div>;}
+function Fi({l,v,s,p,m,rows=2,type}){return<div style={{marginBottom:14}}><div style={S.fl}>{l}</div>{m?<textarea value={v} onChange={e=>s(e.target.value)} placeholder={p} rows={rows} style={{...S.inp,resize:"vertical",minHeight:rows*24}}/>:<input type={type||"text"} value={v} onChange={e=>s(e.target.value)} placeholder={p} style={S.inp}/>}</div>;}
+function ImgS({src,go,cl,tall,small,uploading,prog}){
+  if(uploading)return<div style={{width:"100%",height:tall?140:small?56:88,border:"1.5px dashed #C4956A",borderRadius:8,background:"rgba(196,149,106,0.04)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C4956A" strokeWidth="2" style={{animation:"pulse 1s infinite"}}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+    <span style={{fontSize:11,color:"#C4956A",fontWeight:500}}>{prog||"アップロード中..."}</span>
+  </div>;
+  if(src)return<div style={{position:"relative",marginBottom:6}}><img src={iSrc(src)} alt="" style={{width:"100%",borderRadius:8,display:"block",maxHeight:tall?220:small?100:150,objectFit:"cover"}}/><button onClick={cl} style={{position:"absolute",top:5,right:5,background:"rgba(0,0,0,0.5)",color:"#fff",border:"none",borderRadius:"50%",width:24,height:24,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>;
+  return<button onClick={go} style={{width:"100%",height:tall?140:small?56:88,border:"1.5px dashed #D5D0CA",borderRadius:8,background:"#FAFAF8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5AFA8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span style={{fontSize:11,color:"#A09890"}}>画像を選択</span></button>;}
+const TAG_OPT=["","1F","2F","3F"];
+function TagSelect({value,onChange}){
+  const[c,setC]=useState(!!value&&!TAG_OPT.includes(value));
+  // 外部からカスタムタグが設定されたとき(一括設定など)に表示モードを同期
+  useEffect(()=>{
+    if(value&&!TAG_OPT.includes(value))setC(true);
+    else if(!value||TAG_OPT.includes(value))setC(false);
+  },[value]);
+  if(c)return<div style={{display:"flex",gap:4,alignItems:"center"}}><input value={value} onChange={e=>onChange(e.target.value)} style={{...S.inp,width:60,padding:"5px 7px",textAlign:"center",fontSize:11}} placeholder="タグ"/><button onClick={()=>{onChange("");setC(false);}} style={{background:"none",border:"none",color:"#C4956A",fontSize:10,cursor:"pointer"}}>▼</button></div>;
+  return<div style={{display:"flex",gap:4,alignItems:"center"}}><select value={value} onChange={e=>onChange(e.target.value)} style={{...S.inp,width:60,padding:"5px 4px",fontSize:11,appearance:"auto"}}><option value="">タグ</option>{TAG_OPT.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}</select><button onClick={()=>setC(true)} style={{background:"none",border:"none",color:"#C4956A",fontSize:10,cursor:"pointer"}}>✎</button></div>;}
+function MoveButtons({index,total,onMove}){return<div style={{display:"flex",flexDirection:"column",gap:2,justifyContent:"center"}}>{index>0&&<button onClick={()=>onMove(index,index-1)} style={S.mvB}>▲</button>}{index<total-1&&<button onClick={()=>onMove(index,index+1)} style={S.mvB}>▼</button>}</div>;}
+function QRCode({url,size=160}){return<img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&margin=8`} alt="QR" style={{width:size,height:size,borderRadius:8,display:"block"}}/>;}
+function Toggle({on,onToggle,label,accent}){const a=accent||"#C4956A";return<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:"10px 12px",background:"#fff",borderRadius:8,border:"1px solid #EDEAE6"}}><span style={{fontSize:12,color:"#6B6560",flex:1}}>{label}</span><button onClick={onToggle} style={{width:44,height:24,borderRadius:12,border:"none",background:on?a:"#D5D0CA",cursor:"pointer",position:"relative"}}><div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:on?22:2,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></button></div>;}
+
+/* ━━━ A3 PDF出力（複数ページ対応） ━━━ */
+const A3W=1587,A3H=1123;
+const PG=({id,children})=><div id={id} style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:"#fff",overflow:"hidden",display:"flex",flexDirection:"column"}}/>;
+
+/* ヘッダー共通 */
+function PdfHdr({data,sub}){const th=T(data);const a=th.accent;const d=th.dark;
+  return<div style={{display:"flex",alignItems:"center",padding:"18px 36px",background:d,color:"#fff",flexShrink:0}}>
+    <div style={{flex:1}}>
+      <div style={{fontSize:9,letterSpacing:6,color:`${a}99`,textTransform:"uppercase"}}>KITA HOUSING — PROPOSAL</div>
+      <div style={{fontSize:20,fontWeight:300,letterSpacing:4,marginTop:3}}>{data.customerName?`${data.customerName} 様邸`:"提案書"}</div>
+    </div>
+    <div style={{textAlign:"right"}}>
+      <div style={{fontSize:13,fontWeight:300,letterSpacing:3,color:"rgba(255,255,255,0.8)"}}>{data.planTitle}{sub?` — ${sub}`:""}</div>
+      {data.staffName&&<div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:3}}>担当：{data.staffName}</div>}
+    </div>
+  </div>;
+}
+/* フッター共通 */
+function PdfFtr({data,pageNum,totalPages}){const th=T(data);const a=th.accent;const d=th.dark;
+  return<div style={{display:"flex",padding:"10px 36px 14px",background:th.secBg,borderTop:`1px solid ${th.tagBorder}`,flexShrink:0,alignItems:"center"}}>
+    <div style={{flex:1,display:"flex",alignItems:"center",gap:16}}>
+      <div style={{fontSize:13,fontWeight:300,color:d,letterSpacing:2}}>{data.contact.phone}</div>
+      <div style={{fontSize:7.5,color:"#A09890"}}>{data.contact.hours}</div>
+      <div style={{fontSize:7.5,color:"#A09890"}}>喜多ハウジング株式会社　{data.contact.address}</div>
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:12}}>
+      <div style={{fontSize:8,color:"#A09890"}}>{pageNum} / {totalPages}</div>
+      <div style={{width:20,height:1.5,background:a,borderRadius:1}}/>
+      <div style={{fontSize:6.5,color:"#CCC5BE",letterSpacing:2}}>© 2026 KITA HOUSING</div>
+    </div>
+  </div>;
+}
+
+/* P1: コンセプト・仕様・価格・連絡先（＋フロア1枚の場合は間取り） */
+function PdfPage1({data,totalPages,showFloor}){
+  const th=T(data);const a=th.accent;const d=th.dark;
+  const specs=data.specs.filter(s=>s.category&&s.value);
+  const pItems=data.pricing?.items?.filter(p=>p.label&&p.amount)||[];
+  const floors=data.plan.floors.filter(f=>f.image);
+  return<div id="pdf-p1" style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:"#fff",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <PdfHdr data={data}/>
+    <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+      {/* 左: メイン画像 + コンセプト */}
+      <div style={{width:"34%",display:"flex",flexDirection:"column",borderRight:`1px solid ${th.tagBorder}`,overflow:"hidden"}}>
+        {data.coverImage&&<div style={{width:"100%",height:240,flexShrink:0,overflow:"hidden"}}>
+          <img src={iSrc(data.coverImage)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        </div>}
+        <div style={{flex:1,padding:"20px 24px 16px 36px",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:10}}>CONCEPT</div>
+          <div style={{fontSize:14,fontWeight:300,color:d,lineHeight:1.9,whiteSpace:"pre-line",marginBottom:10}}>{data.concept.headline}</div>
+          <div style={{fontSize:8.5,lineHeight:2.1,color:"#6B6560",flex:1,overflow:"hidden"}}>{data.concept.body}</div>
+          {data.concept.tags.filter(Boolean).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:10}}>
+            {data.concept.tags.filter(Boolean).map((t,i)=><span key={i} style={{padding:"3px 8px",border:`1px solid ${th.tagBorder}`,borderRadius:4,fontSize:7.5,color:"#6B6560"}}>{t}</span>)}
+          </div>}
+        </div>
+      </div>
+      {/* 中: 仕様 + 間取り(1枚の場合) */}
+      <div style={{width:showFloor?"32%":"28%",padding:"20px 20px",display:"flex",flexDirection:"column",borderRight:`1px solid ${th.tagBorder}`,overflow:"hidden"}}>
+        <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:10}}>SPECIFICATIONS</div>
+        <div style={{marginBottom:16,overflow:"hidden"}}>
+          {specs.map((s,i)=><div key={i} style={{display:"flex",padding:"4px 0",borderBottom:`1px solid ${th.tagBorder}`,gap:8}}>
+            <span style={{fontSize:8,color:"#A09890",fontWeight:500,minWidth:52,flexShrink:0}}>{s.category}</span>
+            <span style={{fontSize:8.5,color:d,lineHeight:1.5}}>{s.value}</span>
+          </div>)}
+        </div>
+        {showFloor&&floors.length>0&&<>
+          <div style={{width:"100%",height:1,background:th.tagBorder,marginBottom:12}}/>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:6}}>PLAN</div>
+          {data.plan.area&&<div style={{fontSize:8,color:"#A09890",marginBottom:8}}>{data.plan.area}㎡（{data.plan.tsubo}坪）</div>}
+          <div style={{flex:1,minHeight:0,borderRadius:6,overflow:"hidden"}}>
+            <img src={iSrc(floors[0].image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
+          </div>
+        </>}
+      </div>
+      {/* 右: 価格 + 連絡先 */}
+      <div style={{flex:1,padding:"20px 36px 16px 20px",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {data.pricing?.show!==false&&pItems.length>0&&<>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:10}}>PRICE</div>
+          <div style={{marginBottom:16}}>
+            {pItems.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${th.tagBorder}`}}>
+              <span style={{fontSize:9,color:"#6B6560"}}>{it.label}</span>
+              <span style={{fontSize:10,color:d,fontWeight:500}}>{it.amount}</span>
+            </div>)}
+            {data.pricing.total&&<div style={{marginTop:8,padding:"10px 0",borderTop:`2px solid ${d}`,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+              <span style={{fontSize:10,color:d,fontWeight:600,letterSpacing:2}}>合計（税込）</span>
+              <span style={{fontSize:22,color:d,fontWeight:300}}>{data.pricing.total}</span>
+            </div>}
+            {data.pricing.notes&&<div style={{fontSize:7.5,color:"#A09890",marginTop:4}}>※ {data.pricing.notes}</div>}
+          </div>
+        </>}
+        <div style={{marginTop:"auto"}}>
+          <div style={{width:"100%",height:1,background:th.tagBorder,marginBottom:14}}/>
+          <div style={{fontSize:8,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:10}}>CONTACT</div>
+          <div style={{fontSize:16,fontWeight:300,color:d,letterSpacing:2,marginBottom:6}}>{data.contact.phone}</div>
+          <div style={{fontSize:9,color:"#A09890",marginBottom:3}}>{data.contact.hours}</div>
+          <div style={{fontSize:9,color:"#A09890"}}>喜多ハウジング株式会社　{data.contact.address}</div>
+        </div>
+      </div>
+    </div>
+    <PdfFtr data={data} pageNum={1} totalPages={totalPages}/>
+  </div>;
+}
+
+/* 間取りページ（2枚/ページ、アスペクト比維持） */
+function PdfPageFloor({data,floors,pageIdx,pageNum,totalPages}){
+  const th=T(data);const a=th.accent;const d=th.dark;
+  return<div id={`pdf-floor-${pageIdx}`} style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:"#fff",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <PdfHdr data={data} sub="PLAN"/>
+    <div style={{flex:1,padding:"24px 36px",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{fontSize:9,letterSpacing:5,color:a,textTransform:"uppercase",marginBottom:6,flexShrink:0}}>FLOOR PLAN</div>
+      {data.plan.area&&<div style={{fontSize:9,color:"#A09890",marginBottom:14,flexShrink:0}}>延床面積 {data.plan.area}㎡（{data.plan.tsubo}坪）</div>}
+      <div style={{flex:1,display:"flex",gap:20,overflow:"hidden"}}>
+        {floors.map((fl,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
+          <div style={{fontSize:10,fontWeight:600,color:d,marginBottom:8,display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+            <span style={{background:d,color:"#fff",fontSize:8,padding:"2px 10px",borderRadius:3}}>{fl.label}</span>
+          </div>
+          {/* アスペクト比維持：object-fit:contain */}
+          <div style={{flex:1,minHeight:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <img src={iSrc(fl.image)} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
+          </div>
+        </div>)}
+      </div>
+    </div>
+    <PdfFtr data={data} pageNum={pageNum} totalPages={totalPages}/>
+  </div>;
+}
+
+/* 外観・内装共用4枚グリッドページ */
+function PdfPageImg({data,views,pageIdx,pageNum,totalPages,subTitle}){
+  const th=T(data);const a=th.accent;const d=th.dark;
+  const isDark=subTitle==="INTERIOR";
+  const bg=isDark?th.darkBg:"#fff";
+  return<div id={`pdf-${subTitle.toLowerCase()}-${pageIdx}`} style={{width:A3W,height:A3H,fontFamily:"'Noto Sans JP',sans-serif",background:bg,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <PdfHdr data={data} sub={subTitle}/>
+    <div style={{flex:1,padding:"20px 36px",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{fontSize:9,letterSpacing:5,color:isDark?`${a}99`:a,textTransform:"uppercase",marginBottom:14,flexShrink:0}}>{subTitle} — {pageIdx+1}</div>
+      <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:12,overflow:"hidden"}}>
+        {views.map((v,i)=><div key={i} style={{borderRadius:10,overflow:"hidden",position:"relative",minHeight:0,background:isDark?`${d}40`:"#F5F3F0"}}>
+          {/* アスペクト比維持：contain */}
+          <img src={iSrc(v.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"24px 14px 10px",background:"linear-gradient(transparent, rgba(0,0,0,0.65))"}}>
+            <div style={{fontSize:12,color:"#fff",fontWeight:400,letterSpacing:2}}>{v.label||"無題"}</div>
+            {v.tag&&<div style={{fontSize:7.5,color:`${a}CC`,marginTop:2}}>{v.tag}</div>}
+          </div>
+        </div>)}
+        {Array.from({length:4-views.length}).map((_,i)=><div key={`e${i}`} style={{borderRadius:10,background:isDark?`${d}20`:"#F5F3F0"}}/>)}
+      </div>
+    </div>
+    <PdfFtr data={data} pageNum={pageNum} totalPages={totalPages}/>
+  </div>;
+}
+
+function PdfLayout({data}){
+  const iv=data.interior.views.filter(v=>v.image);
+  const ev=data.exterior.views.filter(v=>v.image);
+  const floors=data.plan.floors.filter(f=>f.image);
+  // フロア数に応じたページ割り当て
+  // 0-1枚: P1に含める / 2枚: P2 / 3-4枚: P2+P3
+  const floorPages=[];
+  if(floors.length>=2){
+    if(floors.length<=2)floorPages.push(floors);
+    else{floorPages.push(floors.slice(0,2));if(floors.length>2)floorPages.push(floors.slice(2,4));}
+  }
+  const intPages=[];for(let i=0;i<iv.length;i+=4)intPages.push(iv.slice(i,i+4));
+  const extPages=[];for(let i=0;i<ev.length;i+=4)extPages.push(ev.slice(i,i+4));
+  const totalPages=1+floorPages.length+extPages.length+intPages.length;
+  let pageNum=2;
+  return<div style={{position:"fixed",left:-9999,top:0,zIndex:-1}}>
+    <PdfPage1 data={data} totalPages={totalPages} showFloor={floors.length<=1}/>
+    {floorPages.map((chunk,pi)=><PdfPageFloor key={pi} data={data} floors={chunk} pageIdx={pi} pageNum={pageNum++} totalPages={totalPages}/>)}
+    {extPages.map((chunk,pi)=><PdfPageImg key={pi} data={data} views={chunk} pageIdx={pi} pageNum={pageNum++} totalPages={totalPages} subTitle="EXTERIOR"/>)}
+    {intPages.map((chunk,pi)=><PdfPageImg key={pi} data={data} views={chunk} pageIdx={pi} pageNum={pageNum++} totalPages={totalPages} subTitle="INTERIOR"/>)}
+  </div>;
+}
+
+async function exportA3Pdf(data){
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;";
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)"><div style="font-size:14px;color:#2C2420;font-weight:500;margin-bottom:8px">PDF生成中...</div><div id="pdf-progress" style="font-size:11px;color:#A09890">ページを準備しています...</div></div>';
+  document.body.appendChild(ov);
+  const prog=document.getElementById("pdf-progress");
+
+  const iv=data.interior.views.filter(v=>v.image);
+  const ev=data.exterior.views.filter(v=>v.image);
+  const floors=data.plan.floors.filter(f=>f.image);
+  const floorPageCount=floors.length>=2?(floors.length<=2?1:2):0;
+  const extPageCount=Math.ceil(ev.length/4);
+  const intPageCount=Math.ceil(iv.length/4);
+  const totalPages=1+floorPageCount+extPageCount+intPageCount;
+  const pageIds=["pdf-p1",
+    ...Array.from({length:floorPageCount},(_,i)=>`pdf-floor-${i}`),
+    ...Array.from({length:extPageCount},(_,i)=>`pdf-ext-${i}`),
+    ...Array.from({length:intPageCount},(_,i)=>`pdf-int-${i}`)];
+
+  // show all pages for rendering
+  const container=document.querySelector('[style*="left: -9999px"]')||document.querySelector('div[style]');
+  const pdfRoot=document.getElementById("pdf-p1")?.parentElement;
+  if(!pdfRoot){document.body.removeChild(ov);return;}
+  pdfRoot.style.left="0";pdfRoot.style.top="0";pdfRoot.style.zIndex="99999";
+  await new Promise(r=>setTimeout(r,200));
+
+  try{
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a3"});
+
+    // requestAnimationFrame でUIスレッドに処理を返しながら描画（フリーズ防止）
+    const rAF=()=>new Promise(r=>requestAnimationFrame(r));
+    for(let i=0;i<pageIds.length;i++){
+      const el=document.getElementById(pageIds[i]);
+      if(!el)continue;
+      if(prog)prog.textContent=`ページ ${i+1} / ${totalPages} を描画中...`;
+      await rAF(); // UIスレッドに返す
+      await new Promise(r=>setTimeout(r,50)); // 確実に描画を更新
+      const canvas=await html2canvas(el,{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false,width:A3W,height:A3H});
+      if(prog)prog.textContent=`ページ ${i+1} / ${totalPages} PDF変換中...`;
+      await rAF();
+      const imgData=canvas.toDataURL("image/jpeg",0.92);
+      if(i>0)pdf.addPage("a3","landscape");
+      pdf.addImage(imgData,"JPEG",0,0,420,297);
+    }
+    const name=data.customerName?`${data.customerName}様_提案書`:"提案書";
+    pdf.save(`${name}.pdf`);
+  }catch(e){console.error("PDF export error:",e);alert("PDF出力に失敗しました: "+e.message);}
+  finally{pdfRoot.style.left="-9999px";pdfRoot.style.zIndex="-1";document.body.removeChild(ov);}
+}
+
+/* ━━━ App ━━━ */
+function App(){
+  const[mode,setMode]=useState("loading");const[data,setData]=useState(DEFAULT);const[tab,setTab]=useState("basic");const[lb,setLb]=useState(null);const[shareId,setShareId]=useState(null);const[err,setErr]=useState(null);const[saving,setSaving]=useState(false);const[saveProg,setSaveProg]=useState("");const prevRef=useRef("edit");
+  // customer/previewモードは通常スクロール、それ以外はapp-shellスクロール
+  useEffect(()=>{const scroll=mode==="customer"||mode==="preview";const ov=scroll?"auto":"hidden";const h=scroll?"auto":"100%";[document.documentElement,document.body].forEach(el=>{el.style.overflowY=ov;el.style.height=h;});const root=document.getElementById("root");if(root){root.style.overflowY=ov;root.style.height=h;}if(scroll)window.scrollTo(0,0);},[mode]);
+  useEffect(()=>{const hash=location.hash.replace("#","");const p=new URLSearchParams(location.search);
+    if(hash&&hash.length>=4&&p.get("v")==="1"){loadP(hash).then(r=>{if(r?.data){setData(r.data);setMode("customer");}else setMode("notfound");}).catch(()=>setMode("notfound"));return;}
+    if(getKey()){if(hash&&hash.length>=4){loadP(hash).then(r=>{if(r?.data){setData(r.data);lastSavedRef.current=r.data;setShareId(hash);}setMode("edit");}).catch(()=>setMode("edit"));}else setMode("edit");}else setMode("login");
+  },[]);
+  const hLogin=async k=>{setKey(k);try{await listP();setMode("edit");}catch(e){setKey("");throw e;}};
+  const lastSavedRef=useRef(null);
+  const hSave=async()=>{
+    // 同一顧客名→同一ID
+    const name=(data.customerName||"").trim();
+    let id=shareId;
+    if(!id&&name){const map=getNameIdMap("decided");id=map[name]||genId();}
+    else if(!id)id=genId();
+    setSaving(true);setSaveProg("画像をアップロード中...");
+    try{
+      // base64 → R2 URL（保存時に一括アップロード）
+      let uploaded=await uploadPendingImages(data,(done,total)=>setSaveProg(`画像 ${done}/${total} アップロード中...`));
+      const now=new Date().toISOString();
+      const d2={...uploaded,dataType:"decided",updatedAt:now,expiresAt:calcExpiry(now)};
+      // 削除差分（前回保存にあってnowにないR2キーを削除）
+      if(lastSavedRef.current){
+        const oldKeys=extractR2Keys(lastSavedRef.current);
+        const newKeys=extractR2Keys(d2);
+        const toDelete=[...oldKeys].filter(k=>!newKeys.has(k));
+        if(toDelete.length>0){
+          setSaveProg(`不要画像 ${toDelete.length} 件削除中...`);
+          await Promise.allSettled(toDelete.map(k=>api(`/api/images/${k}`,{method:"DELETE",auth:true})));
+        }
+      }
+      setSaveProg("保存中...");
+      await saveP(id,d2);
+      setData(d2);
+      lastSavedRef.current=d2;
+      setShareId(id);
+      // 顧客名IDマップを更新
+      if(name){const map=getNameIdMap("decided");map[name]=id;setNameIdMap("decided",map);}
+      return id;
+    }catch(e){alert("保存エラー: "+e.message);setErr(e.message);return null;}
+    finally{setSaving(false);setSaveProg("");}
+  };
+  const hLoad=async id=>{try{const r=await loadP(id);if(r?.data){setData(r.data);lastSavedRef.current=r.data;setShareId(id);setMode("edit");}else{alert("データの読み込みに失敗しました");}}catch(e){alert("読み込みエラー: "+e.message);}};
+  if(mode==="loading")return<Sh full><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{color:"#A09890",fontSize:13}}>読み込み中...</p></div></Sh>;
+  if(mode==="notfound")return<Sh full><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}><div style={{textAlign:"center"}}><div style={{fontSize:48,marginBottom:16,opacity:.3}}>📄</div><div style={{fontSize:16,fontWeight:500,marginBottom:8}}>データが見つかりません</div><div style={{fontSize:13,color:"#A09890"}}>URLが正しいかご確認ください</div></div></div></Sh>;
+  if(mode==="login")return<Login onDone={hLogin}/>;
+  if(mode==="walkthrough")return<WT url={data.viewer3dUrl} onClose={()=>setMode(prevRef.current)}/>;
+  return<>
+    {mode==="customer"&&<CV data={data} onWt={()=>{prevRef.current="customer";setMode("walkthrough");}} onZoom={setLb}/>}
+    {mode==="preview"&&<div style={{width:"100%",height:"100%",position:"relative"}}><div className="no-print" style={{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:100,display:"flex",gap:8}}><button onClick={()=>setMode("edit")} style={{background:"rgba(44,36,32,0.85)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer"}}>◀ 編集</button><button onClick={()=>exportA3Pdf(data)} style={{background:"rgba(196,149,106,0.9)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>A3 PDF</button></div><div><Pres data={data} sy={0} onWt={()=>{prevRef.current="preview";setMode("walkthrough");}} onZoom={setLb}/></div></div>}
+    {mode==="edit"&&<EdWrap data={data} setData={setData} tab={tab} setTab={setTab} onPv={()=>setMode("preview")} sid={shareId} onSave={hSave} onLoad={hLoad} onNew={()=>{setData(JSON.parse(JSON.stringify(DEFAULT)));setShareId(null);setTab("basic");lastSavedRef.current=null;}} onList={()=>setMode("list")} err={err} setErr={setErr} onLogout={()=>{setKey("");setMode("login");}} saving={saving} saveProg={saveProg}/>}
+    {mode==="list"&&<LSWrap onLoad={hLoad} onBack={()=>setMode("edit")}/>}
+    {lb&&mode!=="walkthrough"&&<LightBox {...lb} onClose={()=>setLb(null)} onChange={setLb}/>}
+    <PdfLayout data={data}/>
+  </>;
+}
+function Login({onDone}){const[k,setK]=useState("");const[t,setT]=useState(false);const[e,setE]=useState(null);
+  const go=async()=>{setT(true);setE(null);try{await onDone(k);}catch(ex){setE(ex.message);}setT(false);};
+  return<Sh><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}><div style={{width:"100%",maxWidth:360}}>
+    <div style={{textAlign:"center",marginBottom:40}}><div style={{fontSize:9,letterSpacing:6,color:"#A09890"}}>KITA HOUSING</div><div style={{fontSize:20,fontWeight:300,color:"#2C2420",letterSpacing:2,marginTop:8}}>提案書ツール</div><div style={{width:30,height:1,background:"#C4956A",margin:"16px auto"}}/></div>
+    <div style={{background:"#fff",borderRadius:12,padding:24}}><div style={{fontSize:14,fontWeight:600,color:"#2C2420",marginBottom:16}}>スタッフログイン</div><Fi l="APIキー" v={k} s={setK} p="キーを入力" type="password"/>{e&&<div style={{padding:12,background:"#FFF0F0",borderRadius:8,fontSize:11,color:"#C44",marginBottom:12}}>{e}</div>}<button onClick={go} disabled={!k||t} style={{width:"100%",padding:"14px 0",background:k?"#2C2420":"#E5E0DA",color:k?"#fff":"#A09890",border:"none",borderRadius:8,fontSize:13,fontWeight:500,cursor:k?"pointer":"default"}}>{t?"確認中...":"ログイン"}</button></div>
+  </div></div></Sh>;}
+
+/* ━━━ Editor（サイドバー + 1カラム） ━━━ */
+const TABS=[{id:"basic",l:"基本"},{id:"concept",l:"コンセプト"},{id:"plan",l:"間取り"},{id:"exterior",l:"外観"},{id:"interior",l:"内装"},{id:"ba",l:"B/A"},{id:"3d",l:"3D"},{id:"spec",l:"仕様"},{id:"price",l:"価格"},{id:"contact",l:"連絡先"}];
+
+function EdWrap(props){const th=T(props.data);const[showSh,setShowSh]=useState(false);const[sid,setSid]=useState(props.sid);useEffect(()=>{setSid(props.sid);},[props.sid]);const shareUrl=sid?`${location.origin}${location.pathname}?v=1#${sid}`:"";const saving=props.saving||false;const saveProg=props.saveProg||"";const u=(p,v)=>up(props.setData,p,v);
+  return<div style={{width:"100%",height:"100%",display:"flex",background:th.accentLight}}>
+    <div style={{width:190,flexShrink:0,background:"#fff",borderRight:"1px solid #EDEAE6",display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}><div style={{padding:"16px 16px 12px"}}><div style={{fontSize:9,letterSpacing:4,color:th.accent}}>KITA HOUSING</div><div style={{fontSize:13,fontWeight:600,color:th.dark,marginTop:4}}>ご契約 提案書</div><div style={{width:20,height:1.5,background:th.accent,marginTop:8,borderRadius:1}}/></div>
+      <div style={{flex:1,overflowY:"auto",padding:"4px 8px",minHeight:0}}>{TABS.map(t=><button key={t.id} onClick={()=>props.setTab(t.id)} style={{width:"100%",padding:"10px 12px",border:"none",borderRadius:8,marginBottom:2,textAlign:"left",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,background:props.tab===t.id?th.accentLight:"transparent",color:props.tab===t.id?th.dark:"#8B8580",fontWeight:props.tab===t.id?600:400,borderLeft:props.tab===t.id?`3px solid ${th.accent}`:"3px solid transparent"}}>{t.l}</button>)}</div>
+      <div style={{padding:12,borderTop:"1px solid #EDEAE6",display:"flex",flexDirection:"column",gap:6}}><div style={{display:"flex",gap:4}}><button onClick={props.onNew} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>新規</button><button onClick={props.onList} style={{...S.smB,background:th.accentLight,color:th.dark,flex:1,textAlign:"center",border:`1px solid ${th.tagBorder}`}}>一覧</button></div><div style={{display:"flex",gap:4}}><button onClick={async()=>{if(saving)return;const id=await props.onSave();if(id){setSid(id);setShowSh(true);}}} disabled={saving} style={{...S.smB,background:saving?"#B5AFA8":th.accent,color:"#fff",flex:1,textAlign:"center",cursor:saving?"default":"pointer"}}>{saving?(saveProg||"保存中..."):"保存"}</button><button onClick={props.onPv} style={{...S.smB,background:th.dark,color:"#fff",flex:1,textAlign:"center"}}>▶ プレビュー</button></div><button onClick={()=>exportA3Pdf(props.data)} style={{width:"100%",padding:"7px 0",border:`1px solid ${th.tagBorder}`,borderRadius:6,background:"#fff",fontSize:11,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,color:th.dark,letterSpacing:1}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={th.accent} strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>A3 PDF出力</button><button onClick={props.onLogout} style={{background:"none",border:"none",color:"#A09890",fontSize:10,cursor:"pointer",padding:"6px 0"}}>ログアウト</button></div></div>
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>{sid&&<div style={{padding:"10px 20px",background:"#fff",borderBottom:"1px solid #EDEAE6",display:"flex",alignItems:"center",gap:10,flexShrink:0}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:9,color:th.accent,letterSpacing:1,fontWeight:500}}>共有URL</div><div style={{fontSize:11,color:"#6B6560",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{shareUrl}</div></div><button onClick={async()=>{try{await navigator.clipboard.writeText(shareUrl);}catch(e){}}} style={{...S.smB,background:th.dark,color:"#fff",fontSize:10,padding:"5px 12px"}}>コピー</button></div>}
+      {showSh&&sid&&<ShareModal url={shareUrl} id={sid} onClose={()=>setShowSh(false)} th={th}/>}
+      {saving&&saveProg&&<div style={{padding:"8px 20px",background:"#F0F4FF",fontSize:11,color:"#5B7FBE",flexShrink:0,display:"flex",alignItems:"center",gap:8}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5B7FBE" strokeWidth="2" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path d="M12 8v4l3 3"/></svg>{saveProg}</div>}
+      {props.err&&<div style={{padding:"10px 20px",background:"#FFF0F0",fontSize:11,color:"#C44",display:"flex",justifyContent:"space-between",flexShrink:0}}><span>{props.err}</span><button onClick={()=>props.setErr(null)} style={{background:"none",border:"none",color:"#C44",cursor:"pointer"}}>✕</button></div>}
+      <div style={{flex:1,overflowY:"auto",padding:"24px 28px 40px",minHeight:0}}><div style={{maxWidth:640}}>
+        {props.tab==="basic"&&<EBas d={props.data} u={u}/>}{props.tab==="concept"&&<ECon d={props.data} u={u}/>}{props.tab==="plan"&&<EPla d={props.data} u={u}/>}{props.tab==="exterior"&&<EExt d={props.data} u={u} th={th}/>}{props.tab==="interior"&&<EInt d={props.data} u={u} th={th}/>}{props.tab==="ba"&&<EBA d={props.data} u={u} th={th}/>}{props.tab==="3d"&&<FS t="3Dウォークスルー"><Fi l="URL" v={props.data.viewer3dUrl} s={v=>u("viewer3dUrl",v)} p="https://..."/></FS>}{props.tab==="spec"&&<ESpe d={props.data} u={u}/>}{props.tab==="price"&&<EPri d={props.data} u={u} th={th}/>}{props.tab==="contact"&&<ECon2 d={props.data} u={u}/>}
+      </div></div></div></div>;}
+function ShareModal({url,id,onClose,th}){const[cp,setCp]=useState(false);return<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}><div style={{fontSize:16,fontWeight:600,marginBottom:16}}>保存しました</div><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><QRCode url={url} size={180}/></div><div style={{background:th.accentLight,borderRadius:10,padding:14,marginBottom:14,textAlign:"center"}}><div style={{fontSize:16,fontWeight:600,letterSpacing:3,fontFamily:"monospace"}}>{id}</div></div><div style={{background:th.accentLight,borderRadius:8,padding:"10px 12px",marginBottom:16,wordBreak:"break-all",fontSize:10,color:"#6B6560",fontFamily:"monospace"}}>{url}</div><div style={{display:"flex",gap:8}}><button onClick={async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}}} style={{flex:1,padding:"12px 0",background:th.dark,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer"}}>{cp?"✓ コピー済み":"URLをコピー"}</button><button onClick={onClose} style={{padding:"12px 18px",background:th.accentLight,color:th.dark,border:"none",borderRadius:8,fontSize:12,cursor:"pointer"}}>閉じる</button></div></div></div>;}
+function LSWrap({onLoad,onBack}){const[list,setList]=useState([]);const[ld,setLd]=useState(true);const[q,setQ]=useState("");const[sort,setSort]=useState("date-desc");const impRef=useRef(null);
+  useEffect(()=>{listP().then(r=>{const items=r||[];setLd(false);
+    const now=new Date().toISOString();const results=[];let done=0;
+    if(items.length===0){setList([]);return;}
+    items.forEach(it=>{loadP(it.id).then(full=>{const d=full?.data;if(d?.dataType==="decided"){const exp=d.expiresAt||calcExpiry(d.updatedAt);if(exp&&exp<now){delWithImages(it.id,d).catch(()=>{});}else{results.push({...it,updatedAt:d.updatedAt,expiresAt:exp,_data:d});}}}).catch(()=>{}).finally(()=>{done++;if(done===items.length||done%5===0)setList([...results]);});});
+  }).catch(()=>setLd(false));},[]);
+  const filtered=useMemo(()=>{let f=list;if(q){const lq=q.toLowerCase();f=f.filter(i=>(i.customerName||"").toLowerCase().includes(lq)||(i.planTitle||"").toLowerCase().includes(lq)||(i.id||"").toLowerCase().includes(lq));}f=[...f];if(sort==="date-desc")f.sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));else if(sort==="date-asc")f.sort((a,b)=>(a.updatedAt||"").localeCompare(b.updatedAt||""));else if(sort==="name")f.sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));return f;},[list,q,sort]);
+  const handleExport=async it=>{let d=it._data;if(!d){try{const full=await loadP(it.id);d=full?.data;}catch(e){alert("データ取得失敗");return;}}const blob=new Blob([JSON.stringify({id:it.id,data:d},null,2)],{type:"application/json"});const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=`${it.customerName||"export"}_${it.id}.json`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);};
+  const handleImport=async file=>{try{const text=await file.text();const json=JSON.parse(text);const d=json.data||json;const id=genId();const now=new Date().toISOString();d.dataType="decided";d.updatedAt=now;d.expiresAt=calcExpiry(now);await saveP(id,d);onLoad(id);}catch(e){alert("インポート失敗: "+e.message);}};
+  const handleDelete=async id=>{if(!confirm("この物件を削除しますか？\n関連画像もすべて削除されます。"))return;const it=list.find(x=>x.id===id);let d=it?._data;if(!d){try{const full=await loadP(id);d=full?.data;}catch(e){}}try{await delWithImages(id,d);}catch(e){try{await delP(id);}catch(e2){}}setList(l=>l.filter(x=>x.id!==id));};
+  const handleCleanup=async()=>{
+    if(!confirm("使われていない画像をR2から削除します。\n全物件データを確認するため少し時間がかかります。"))return;
+    try{
+      const r=await api("/api/images",{auth:true});
+      const allKeys=new Set(r.keys||[]);
+      if(allKeys.size===0){alert("R2に画像がありません。");return;}
+      const usedKeys=new Set();
+      const allItems=[...list];
+      for(const it of allItems){
+        let d=it._data;
+        if(!d){try{const full=await loadP(it.id);d=full?.data;}catch(e){continue;}}
+        extractR2Keys(d).forEach(k=>usedKeys.add(k));
+      }
+      const orphans=[...allKeys].filter(k=>!usedKeys.has(k));
+      if(orphans.length===0){alert("孤立した画像はありません。\n（R2: "+allKeys.size+"件 / 使用中: "+usedKeys.size+"件）");return;}
+      if(!confirm(orphans.length+"件の未使用画像を削除します。\nR2合計: "+allKeys.size+"件 → 削除後: "+(allKeys.size-orphans.length)+"件"))return;
+      await Promise.allSettled(orphans.map(k=>api("/api/images/"+k,{method:"DELETE",auth:true})));
+      alert("✓ "+orphans.length+"件の不要画像を削除しました。");
+    }catch(e){alert("クリーンアップ失敗: "+e.message);}
+  };
+  return<div style={{width:"100%",height:"100%",background:"#FAF8F5",display:"flex",flexDirection:"column"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid #EDEAE6",background:"#fff",flexShrink:0}}><button onClick={onBack} style={{background:"none",border:"none",fontSize:13,cursor:"pointer"}}>◀ 戻る</button><div style={{fontSize:14,fontWeight:600}}>物件一覧</div><button onClick={handleCleanup} title="不要画像を削除" style={{background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 8px",fontSize:10,color:"#A09890",cursor:"pointer"}}>🧹 R2整理</button></div>
+    <div style={{padding:"12px 16px",background:"#fff",borderBottom:"1px solid #EDEAE6",flexShrink:0}}>
+      <div style={{display:"flex",gap:8}}><div style={{flex:1,position:"relative"}}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="検索（名前・タイトル・ID）" style={{...S.inp,paddingLeft:32,fontSize:12}}/><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09890" strokeWidth="2" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)"}}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><select value={sort} onChange={e=>setSort(e.target.value)} style={{...S.inp,width:130,fontSize:11,padding:"8px 10px"}}><option value="date-desc">更新日↓新しい</option><option value="date-asc">更新日↑古い</option><option value="name">名前順</option></select><button onClick={()=>impRef.current?.click()} style={{...S.smB,background:"#2C2420",color:"#fff",flexShrink:0,fontSize:10,padding:"8px 12px"}}>インポート</button><input ref={impRef} type="file" accept=".json" onChange={e=>{const f=e.target.files?.[0];if(f)handleImport(f);e.target.value="";}} style={{display:"none"}}/></div></div>
+    <div style={{flex:1,overflowY:"auto",padding:16,minHeight:0}}>{ld&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>読み込み中...</div>}{!ld&&filtered.length===0&&<div style={{textAlign:"center",padding:60,color:"#A09890"}}>{q?"該当なし":"データなし"}</div>}{filtered.map(it=>{const rd=remainDays(it.expiresAt);return<div key={it.id} style={{padding:14,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",marginBottom:8,display:"flex",alignItems:"center",gap:12,maxWidth:700}}><div style={{width:4,height:40,borderRadius:2,background:"#6B8F71",flexShrink:0}}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,fontWeight:500}}>{it.customerName||"未設定"} 様</span></div><div style={{fontSize:11,color:"#A09890",marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}><span>{it.planTitle}</span><span style={{fontFamily:"monospace",fontSize:10}}>#{it.id}</span><span style={{fontSize:10,color:"#B5AFA8"}}>{fmtDate(it.updatedAt)}</span>{rd!=null&&<span style={{fontSize:9,color:rd<30?"#C44":"#A09890",fontWeight:rd<30?600:400}}>期限 {fmtDateShort(it.expiresAt)}（残{rd}日）</span>}</div></div><button onClick={()=>handleExport(it)} title="エクスポート" style={{background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"6px 8px",cursor:"pointer",flexShrink:0}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09890" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button><button onClick={()=>onLoad(it.id)} style={{background:"#2C2420",color:"#fff",border:"none",borderRadius:6,padding:"8px 14px",fontSize:11,cursor:"pointer",flexShrink:0}}>開く</button><button onClick={()=>handleDelete(it.id)} style={{background:"none",border:"none",color:"#CCC5BE",fontSize:16,cursor:"pointer",flexShrink:0}}>✕</button></div>;})}</div></div>;}
+
+/* ━━━ Editor Tabs（1カラム） ━━━ */
+function EBas({d,u}){const img=useImg(b=>u("coverImage",b));
+  return<FS t="基本情報">
+    <div style={{marginBottom:20}}><div style={S.fl}>テーマカラー</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{Object.entries(THEMES).map(([k,th])=><button key={k} onClick={()=>u("theme",k)} style={{padding:"8px 14px",borderRadius:8,border:d.theme===k?`2px solid ${th.accent}`:"2px solid #E5E0DA",background:d.theme===k?th.accentLight:"#fff",color:d.theme===k?th.accent:"#8B8580",fontSize:12,cursor:"pointer",fontWeight:d.theme===k?600:400,display:"flex",alignItems:"center",gap:6}}><div style={{width:16,height:16,borderRadius:"50%",background:th.accent,border:"2px solid #fff",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}/>{th.name}</button>)}</div></div>
+    <Fi l="お客様名" v={d.customerName} s={v=>u("customerName",v)} p="例：山田 太郎"/>
+    <Fi l="担当者名" v={d.staffName} s={v=>u("staffName",v)}/>
+    <Fi l="プランタイトル" v={d.planTitle} s={v=>u("planTitle",v)}/>
+    <div style={{marginTop:12}}><div style={S.fl}>カバー画像</div><ImgS src={d.coverImage} go={img.go} cl={()=>u("coverImage",null)} tall uploading={img.uploading} prog={img.prog}/>{img.el}</div>
+  </FS>;}
+function ECon({d,u}){return<FS t="コンセプト"><Fi l="キャッチコピー" v={d.concept.headline} s={v=>u("concept.headline",v)} m rows={3}/><Fi l="説明文" v={d.concept.body} s={v=>u("concept.body",v)} m rows={5}/><div style={S.fl}>キーワード</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{d.concept.tags.map((t,i)=><input key={i} value={t} onChange={e=>{const a=[...d.concept.tags];a[i]=e.target.value;u("concept.tags",a);}} style={S.inp}/>)}</div></FS>;}
+function EPla({d,u}){return<FS t="間取り"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}><Fi l="延床面積（㎡）" v={d.plan.area} s={v=>u("plan.area",v)}/><Fi l="坪数" v={d.plan.tsubo} s={v=>u("plan.tsubo",v)}/></div>{d.plan.floors.map((fl,fi)=><FE key={fi} fl={fl} fi={fi} d={d} u={u}/>)}{d.plan.floors.length<3&&<button onClick={()=>u("plan.floors",[...d.plan.floors,{label:`${d.plan.floors.length+1}F`,image:null}])} style={{...S.aB,background:"#F0EDE8"}}>＋ フロア</button>}</FS>;}
+function FE({fl,fi,d,u}){const img=useImg(b=>u(`plan.floors.${fi}.image`,b));return<div style={{marginBottom:16,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{background:"#2C2420",color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:4}}>{fl.label}</div><input value={fl.label} onChange={e=>u(`plan.floors.${fi}.label`,e.target.value)} style={{...S.inp,width:56,padding:"4px 8px",textAlign:"center"}}/></div>{d.plan.floors.length>1&&<button onClick={()=>u("plan.floors",d.plan.floors.filter((_,j)=>j!==fi))} style={S.xB}>✕</button>}</div><ImgS src={fl.image} go={img.go} cl={()=>u(`plan.floors.${fi}.image`,null)} uploading={img.uploading} prog={img.prog}/>{img.el}</div>;}
+function EExt({d,u,th}){const a=th?.accent||"#C4956A";const bulk=useBulkImg(res=>{const v=[...d.exterior.views];for(const r of res){const i=v.findIndex(x=>x.label===r.label);if(i>=0)v[i]={...v[i],image:r.image};else v.push({label:r.label,image:r.image});}u("exterior.views",v);});const move=(f,t)=>{const v=[...d.exterior.views];const[it]=v.splice(f,1);v.splice(t,0,it);u("exterior.views",v);};
+  return<FS t="外観パース"><button onClick={bulk.go} disabled={bulk.uploading} style={{...S.bulkBtn,borderColor:a,color:a,marginBottom:12}}>{bulk.uploading?`${bulk.prog||"アップロード中..."}...`:"画像を一括追加"}</button>{bulk.el}{d.exterior.views.map((v,i)=><ExtVI key={i} v={v} i={i} d={d} u={u} total={d.exterior.views.length} onMove={move}/>)}<button onClick={()=>u("exterior.views",[...d.exterior.views,{label:"",image:null}])} style={S.aB}>＋ 手動で追加</button><div style={{marginTop:16}}/><Fi l="説明" v={d.exterior.description} s={v=>u("exterior.description",v)} m rows={3}/></FS>;}
+function ExtVI({v,i,d,u,total,onMove}){const img=useImg(b=>u(`exterior.views.${i}.image`,b));return<div style={{marginBottom:8,padding:10,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6",display:"flex",gap:8}}><MoveButtons index={i} total={total} onMove={onMove}/><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6}}><input value={v.label} onChange={e=>u(`exterior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><button onClick={()=>u("exterior.views",d.exterior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`exterior.views.${i}.image`,null)} small uploading={img.uploading} prog={img.prog}/>{img.el}</div></div>;}
+function EInt({d,u,th}){const a=th?.accent||"#C4956A";const bulk=useBulkImg(res=>{const v=[...d.interior.views];for(const r of res){const i=v.findIndex(x=>x.label===r.label);if(i>=0)v[i]={...v[i],image:r.image};else v.push({label:r.label,image:r.image,tag:""});}u("interior.views",v);});const move=(f,t)=>{const v=[...d.interior.views];const[it]=v.splice(f,1);v.splice(t,0,it);u("interior.views",v);};
+  const[sel,setSel]=useState(new Set());const[cusTag,setCusTag]=useState("");const toggle=i=>setSel(p=>{const n=new Set(p);n.has(i)?n.delete(i):n.add(i);return n;});const selAll=()=>setSel(p=>p.size===d.interior.views.length?new Set():new Set(d.interior.views.map((_,i)=>i)));const applyTag=tag=>{if(sel.size===0)return;u("interior.views",d.interior.views.map((item,idx)=>sel.has(idx)?{...item,tag}:item));setSel(new Set());};
+  const existingTags=[...new Set(d.interior.views.map(v=>v.tag).filter(Boolean))];const presetTags=["1F","2F","3F"];const customTags=existingTags.filter(t=>!presetTags.includes(t));
+  return<FS t="内装 3Dビュー"><button onClick={bulk.go} disabled={bulk.uploading} style={{...S.bulkBtn,borderColor:a,color:a,marginBottom:12}}>{bulk.uploading?`${bulk.prog||"アップロード中..."}...`:"画像を一括追加"}</button>{bulk.el}
+    {d.interior.views.length>0&&<div style={{display:"flex",gap:6,alignItems:"center",marginBottom:12,padding:"8px 10px",background:"#fff",borderRadius:8,border:"1px solid #EDEAE6",flexWrap:"wrap"}}><button onClick={selAll} style={{fontSize:11,color:sel.size===d.interior.views.length?a:"#A09890",background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{sel.size===d.interior.views.length?"全解除":"全選択"}</button>{sel.size>0?<><span style={{fontSize:11,color:"#6B6560"}}>{sel.size}件 →</span>{presetTags.map(t=><button key={t} onClick={()=>applyTag(t)} style={{fontSize:11,color:"#fff",background:a,border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{t}</button>)}{customTags.map(t=><button key={t} onClick={()=>applyTag(t)} style={{fontSize:11,color:"#fff",background:"#7E8B9A",border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>{t}</button>)}<div style={{display:"flex",gap:3,alignItems:"center"}}><input value={cusTag} onChange={e=>setCusTag(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();if(cusTag.trim()){applyTag(cusTag.trim());setCusTag("");}}}} placeholder="カスタム" style={{...S.inp,width:72,padding:"4px 7px",fontSize:11}}/><button onClick={()=>{if(cusTag.trim()){applyTag(cusTag.trim());setCusTag("");}}} disabled={!cusTag.trim()} style={{fontSize:11,color:cusTag.trim()?"#fff":"#A09890",background:cusTag.trim()?a:"#E5E0DA",border:"none",borderRadius:6,padding:"5px 8px",cursor:cusTag.trim()?"pointer":"default"}}>設定</button></div><button onClick={()=>applyTag("")} style={{fontSize:11,color:"#A09890",background:"none",border:"1px solid #E5E0DA",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>解除</button></>:<span style={{fontSize:10,color:"#A09890"}}>チェックでタグ一括設定</span>}</div>}
+    {d.interior.views.map((v,i)=><IntVI key={i} v={v} i={i} d={d} u={u} total={d.interior.views.length} onMove={move} selected={sel.has(i)} onToggle={()=>toggle(i)} accent={a}/>)}<button onClick={()=>u("interior.views",[...d.interior.views,{label:"",image:null,tag:""}])} style={S.aB}>＋ 手動で追加</button><div style={{marginTop:16}}/><Fi l="説明" v={d.interior.description} s={v=>u("interior.description",v)} m rows={3}/></FS>;}
+function IntVI({v,i,d,u,total,onMove,selected,onToggle,accent}){const a=accent||"#C4956A";const img=useImg(b=>u(`interior.views.${i}.image`,b));
+  return<div style={{marginBottom:8,padding:10,background:selected?`${a}0F`:"#fff",borderRadius:10,border:selected?`1.5px solid ${a}`:"1px solid #EDEAE6",display:"flex",gap:8,transition:"all .15s"}}><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><button onClick={onToggle} style={{width:20,height:20,borderRadius:4,border:selected?`2px solid ${a}`:"2px solid #D5D0CA",background:selected?a:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>{selected&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}</button><MoveButtons index={i} total={total} onMove={onMove}/></div><div style={{flex:1}}><div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}><input value={v.label} onChange={e=>u(`interior.views.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="ビュー名"/><TagSelect value={v.tag||""} onChange={val=>u(`interior.views.${i}.tag`,val)}/><button onClick={()=>u("interior.views",d.interior.views.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><ImgS src={v.image} go={img.go} cl={()=>u(`interior.views.${i}.image`,null)} small uploading={img.uploading} prog={img.prog}/>{img.el}</div></div>;}
+function EBA({d,u,th}){const a=th?.accent||"#C4956A";const ba=d.beforeAfter||{show:true,pairs:[]};const show=ba.show!==false;const pairs=ba.pairs||[];
+  const move=(f,t)=>{const p=[...pairs];const[it]=p.splice(f,1);p.splice(t,0,it);u("beforeAfter.pairs",p);};
+  return<FS t="ビフォーアフター"><Toggle on={show} onToggle={()=>u("beforeAfter.show",!show)} label="B/Aセクションを表示" accent={a}/>{show&&<>{pairs.map((p,i)=><BAPair key={i} p={p} i={i} pairs={pairs} u={u} total={pairs.length} onMove={move}/>)}<button onClick={()=>u("beforeAfter.pairs",[...pairs,{label:"",before:null,after:null}])} style={S.aB}>＋ 比較を追加</button></>}</FS>;}
+function BAPair({p,i,pairs,u,total,onMove}){const imgB=useImg(b=>u(`beforeAfter.pairs.${i}.before`,b));const imgA=useImg(b=>u(`beforeAfter.pairs.${i}.after`,b));
+  return<div style={{marginBottom:12,padding:12,background:"#fff",borderRadius:10,border:"1px solid #EDEAE6"}}><div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center"}}><MoveButtons index={i} total={total} onMove={onMove}/><input value={p.label} onChange={e=>u(`beforeAfter.pairs.${i}.label`,e.target.value)} style={{...S.inp,flex:1,padding:"6px 9px"}} placeholder="場所（例：LDK）"/><button onClick={()=>u("beforeAfter.pairs",pairs.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><div style={{fontSize:10,color:"#A09890",marginBottom:4,textAlign:"center"}}>BEFORE</div><ImgS src={p.before} go={imgB.go} cl={()=>u(`beforeAfter.pairs.${i}.before`,null)} small uploading={imgB.uploading} prog={imgB.prog}/>{imgB.el}</div><div><div style={{fontSize:10,color:"#C4956A",marginBottom:4,textAlign:"center"}}>AFTER</div><ImgS src={p.after} go={imgA.go} cl={()=>u(`beforeAfter.pairs.${i}.after`,null)} small uploading={imgA.uploading} prog={imgA.prog}/>{imgA.el}</div></div></div>;}
+function ESpe({d,u}){return<FS t="仕様">{d.specs.map((s,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={s.category} onChange={e=>u(`specs.${i}.category`,e.target.value)} style={{...S.inp,width:80}} placeholder="項目"/><input value={s.value} onChange={e=>u(`specs.${i}.value`,e.target.value)} style={{...S.inp,flex:1}} placeholder="内容"/><button onClick={()=>u("specs",d.specs.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("specs",[...d.specs,{category:"",value:""}])} style={S.aB}>＋</button></FS>;}
+function EPri({d,u,th}){const a=th?.accent||"#C4956A";const show=d.pricing?.show!==false;return<FS t="資金計画"><Toggle on={show} onToggle={()=>u("pricing.show",!show)} label="お客様に金額を表示" accent={a}/>{show&&<>{d.pricing.items.map((it,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:6}}><input value={it.label} onChange={e=>u(`pricing.items.${i}.label`,e.target.value)} style={{...S.inp,flex:1}} placeholder="項目"/><input value={it.amount} onChange={e=>u(`pricing.items.${i}.amount`,e.target.value)} style={{...S.inp,width:140,textAlign:"right"}} placeholder="金額"/><button onClick={()=>u("pricing.items",d.pricing.items.filter((_,j)=>j!==i))} style={S.xB}>✕</button></div>)}<button onClick={()=>u("pricing.items",[...d.pricing.items,{label:"",amount:""}])} style={S.aB}>＋</button><div style={{marginTop:16}}/><Fi l="合計" v={d.pricing.total} s={v=>u("pricing.total",v)} p="3,100万円"/><Fi l="備考" v={d.pricing.notes} s={v=>u("pricing.notes",v)} m rows={2}/></>}</FS>;}
+function ECon2({d,u}){return<FS t="連絡先"><Fi l="電話" v={d.contact.phone} s={v=>u("contact.phone",v)}/><Fi l="受付" v={d.contact.hours} s={v=>u("contact.hours",v)}/><Fi l="住所" v={d.contact.address} s={v=>u("contact.address",v)}/></FS>;}
+
+/* ━━━ Customer Share ━━━ */
+function SharePanel({onClose,th}){const url=location.href;const[cp,setCp]=useState(false);const d=th?.dark||"#2C2420";
+  return<div style={{position:"fixed",inset:0,zIndex:9000,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}><div style={{background:"rgba(0,0,0,0.4)",position:"absolute",inset:0}}/>
+    <div style={{position:"relative",background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 24px 32px",maxWidth:640,margin:"0 auto",width:"100%"}} onClick={e=>e.stopPropagation()}>
+      <div style={{width:36,height:4,borderRadius:2,background:"#E5E0DA",margin:"0 auto 20px"}}/>
+      <div style={{fontSize:15,fontWeight:600,color:d,marginBottom:20,textAlign:"center"}}>この提案書を共有</div>
+      <div style={{display:"flex",justifyContent:"center",marginBottom:20}}><QRCode url={url} size={160}/></div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {typeof navigator.share==="function"&&<button onClick={async()=>{try{await navigator.share({title:document.title,url});}catch(e){}}} style={{...S.shareBtn,background:d,color:"#fff"}}>共有する</button>}
+        <button onClick={()=>window.open(`https://line.me/R/msg/text/?${encodeURIComponent(url)}`,"_blank")} style={{...S.shareBtn,background:"#06C755",color:"#fff"}}>LINEで送る</button>
+        <button onClick={async()=>{try{await navigator.clipboard.writeText(url);setCp(true);setTimeout(()=>setCp(false),2000);}catch(e){}}} style={{...S.shareBtn,background:"#fff",color:d,border:`1px solid ${th?.tagBorder||"#E5E0DA"}`}}>{cp?"✓ コピーしました":"URLをコピー"}</button>
+      </div>
+      <button onClick={onClose} style={{marginTop:16,width:"100%",padding:"12px 0",background:"none",border:"none",color:"#A09890",fontSize:12,cursor:"pointer"}}>閉じる</button>
+    </div></div>;}
+
+/* ━━━ Views ━━━ */
+function CV({data,onWt,onZoom}){const th=T(data);const[sy,setSy]=useState(0);const[sh,setSh]=useState(false);useEffect(()=>{const h=()=>setSy(window.scrollY);window.addEventListener("scroll",h,{passive:true});return()=>window.removeEventListener("scroll",h);},[]);
+  return<><div><Pres data={data} sy={sy} onWt={onWt} onZoom={onZoom}/></div>
+    <button onClick={()=>setSh(true)} style={{position:"fixed",bottom:24,right:24,zIndex:100,width:52,height:52,borderRadius:"50%",background:th.dark,border:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.25)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
+    {sh&&<SharePanel onClose={()=>setSh(false)} th={th}/>}</>;}
+/* ━━━ B/A Slider ━━━ */
+function BASlider({before,after}){const cRef=useRef(null);const[pos,setPos]=useState(50);const drag=useRef(false);
+  const gp=cx=>{const r=cRef.current?.getBoundingClientRect();return r?Math.min(100,Math.max(0,((cx-r.left)/r.width)*100)):50;};
+  useEffect(()=>{const mm=e=>drag.current&&setPos(gp(e.touches?e.touches[0].clientX:e.clientX));const mu=()=>drag.current=false;
+    window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);window.addEventListener("touchmove",mm,{passive:true});window.addEventListener("touchend",mu);
+    return()=>{window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);window.removeEventListener("touchmove",mm);window.removeEventListener("touchend",mu);};},[]);
+  return<div ref={cRef} style={{position:"relative",width:"100%",maxWidth:900,borderRadius:12,overflow:"hidden",cursor:"col-resize",userSelect:"none",touchAction:"none"}} onMouseDown={e=>{drag.current=true;setPos(gp(e.clientX));}} onTouchStart={e=>{drag.current=true;setPos(gp(e.touches[0].clientX));}}>
+    <img src={iSrc(after)} alt="" style={{width:"100%",height:"auto",display:"block",minHeight:200}}/>
+    <img src={iSrc(before)} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",clipPath:`inset(0 ${100-pos}% 0 0)`}}/>
+    <div style={{position:"absolute",top:0,bottom:0,left:`${pos}%`,width:3,background:"#fff",transform:"translateX(-50%)",boxShadow:"0 0 8px rgba(0,0,0,0.4)",zIndex:2}}/>
+    <div style={{position:"absolute",top:"50%",left:`${pos}%`,transform:"translate(-50%,-50%)",zIndex:3,width:40,height:40,borderRadius:"50%",background:"#fff",boxShadow:"0 2px 12px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2C2420" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2C2420" strokeWidth="2.5" style={{marginLeft:-6}}><path d="M9 18l6-6-6-6"/></svg></div>
+    <div style={{position:"absolute",top:10,left:10,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(6px)",borderRadius:4,padding:"3px 8px",fontSize:10,color:"#fff",letterSpacing:2,zIndex:1}}>BEFORE</div>
+    <div style={{position:"absolute",top:10,right:10,background:"rgba(196,149,106,0.8)",backdropFilter:"blur(6px)",borderRadius:4,padding:"3px 8px",fontSize:10,color:"#fff",letterSpacing:2,zIndex:1}}>AFTER</div>
+  </div>;}
+
+/* ━━━ Presentation（テーマ対応） ━━━ */
+function Pres({data,sy,onWt,onZoom}){
+  const th=T(data);
+  const[af,setAf]=useState(0);const[ei,setEi]=useState(0);const[iFlt,setIFlt]=useState("ALL");const[ii,setIi]=useState(0);
+  useEffect(()=>{setIi(0);},[iFlt]);const ev=data.exterior.views.filter(v=>v.label);const iv=data.interior.views.filter(v=>v.label);
+  const iTags=["ALL",...new Set(iv.map(v=>v.tag).filter(Boolean))];const iF=iFlt==="ALL"?iv:iv.filter(v=>v.tag===iFlt);
+  const zoom=(src,label,list,index)=>{if(src)onZoom({src,label,list:list||null,index:index||0});};
+  const baPairs=(data.beforeAfter?.pairs||[]).filter(p=>p.before&&p.after);
+  return<>
+    <div style={{height:"100vh",position:"relative",overflow:"hidden",display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,zIndex:1,background:`linear-gradient(180deg, ${th.dark}0A 0%, ${th.dark}08 30%, ${th.dark}DD 100%)`}}/>
+      {data.coverImage?<img src={iSrc(data.coverImage)} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",transform:`translateY(${Math.min(sy*0.25,140)}px) scale(1.06)`}}/>:<div style={{position:"absolute",inset:0,background:th.coverGrad,transform:`translateY(${Math.min(sy*0.25,140)}px) scale(1.06)`}}/>}
+      <div style={{position:"relative",zIndex:2,padding:"0 5vw 60px",maxWidth:800,margin:"0 auto",width:"100%"}}>
+        {data.staffName&&<div className="anim-fi" style={{fontSize:10,letterSpacing:5,color:"rgba(255,255,255,0.45)",marginBottom:12}}>担当：{data.staffName}</div>}
+        <h1 className="anim-fu" style={{fontSize:"clamp(28px, 5vw, 48px)",fontWeight:300,color:"#fff",lineHeight:1.5,margin:0,letterSpacing:3}}>{data.customerName?`${data.customerName} 様邸`:"○○様邸"}</h1>
+        <div className="anim-fu" style={{fontSize:"clamp(12px, 1.8vw, 16px)",fontWeight:300,color:"rgba(255,255,255,0.6)",letterSpacing:4,marginTop:8,animationDelay:"0.15s"}}>{data.planTitle}</div>
+        <div className="anim-fi" style={{width:40,height:1.5,background:th.accent,margin:"24px 0",animationDelay:"0.3s",borderRadius:1}}/>
+        <div className="anim-fi" style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:3,animationDelay:"0.4s"}}>喜多ハウジング株式会社</div>
+      </div>
+    </div>
+    <PSec bg={th.secBg}><Lb en="CONCEPT" ja="コンセプト" th={th}/><InView delay={100}><h2 style={{fontSize:"clamp(22px, 3.5vw, 34px)",fontWeight:300,color:th.dark,lineHeight:2,marginBottom:24,whiteSpace:"pre-line"}}>{data.concept.headline}</h2></InView><InView delay={200}><p style={S.bd}>{data.concept.body}</p></InView><InView delay={300}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",gap:10,marginTop:32}}>{data.concept.tags.filter(Boolean).map(t=><div key={t} style={{...S.tg,borderColor:th.tagBorder,background:"#fff"}}>{t}</div>)}</div></InView></PSec>
+    <PSec bg="#fff"><Lb en="PLAN" ja="間取り" th={th}/><InView><div style={{fontSize:12,color:"#A09890",marginBottom:24}}>延床面積 {data.plan.area}㎡（{data.plan.tsubo}坪）</div></InView>{data.plan.floors.length>1&&<InView><div style={{display:"flex",marginBottom:24,background:th.accentLight,borderRadius:10,padding:3,maxWidth:400}}>{data.plan.floors.map((fl,i)=><button key={i} onClick={()=>setAf(i)} style={{flex:1,padding:"11px 0",border:"none",borderRadius:8,fontSize:12,fontWeight:af===i?600:400,background:af===i?"#fff":"transparent",color:af===i?th.dark:"#A09890",cursor:"pointer",boxShadow:af===i?"0 2px 8px rgba(0,0,0,0.06)":"none",transition:"all .2s"}}>{fl.label}</button>)}</div></InView>}<InView>{data.plan.floors[af]?.image?<img src={iSrc(data.plan.floors[af].image)} alt="" onClick={()=>zoom(data.plan.floors[af].image,data.plan.floors[af].label)} style={{width:"100%",maxWidth:600,borderRadius:14,cursor:"pointer"}}/>:<div style={{background:th.accentLight,borderRadius:14,aspectRatio:"4/3",maxWidth:600,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{opacity:0.3,fontSize:22,fontWeight:300,color:th.accent}}>{data.plan.floors[af]?.label}</div></div>}</InView></PSec>
+    <div style={{background:th.secBg,padding:"80px 0"}}><div style={{padding:"0 5vw",maxWidth:800,margin:"0 auto"}}><Lb en="EXTERIOR" ja="外観デザイン" th={th}/></div>{ev.length>0&&<GH items={ev} idx={ei} setIdx={setEi} onZoom={zoom} light th={th}/>}<div style={{padding:"20px 5vw 0",maxWidth:800,margin:"0 auto"}}><InView><p style={S.bd}>{data.exterior.description}</p></InView></div></div>
+    <div style={{background:th.darkBg,padding:"0 0 56px"}}><div style={{padding:"80px 5vw 0",maxWidth:800,margin:"0 auto"}}><Lb en="INTERIOR" ja="内装デザイン" dark th={th}/></div>{iv.length>0&&<>{iTags.length>2&&<div style={{display:"flex",gap:6,padding:"0 5vw 16px",maxWidth:800,margin:"0 auto",overflowX:"auto"}}>{iTags.map(t=><button key={t} onClick={()=>setIFlt(t)} style={{flexShrink:0,padding:"8px 16px",borderRadius:20,border:"1px solid",borderColor:iFlt===t?th.accent:"rgba(255,255,255,0.1)",background:iFlt===t?`${th.accent}20`:"transparent",color:iFlt===t?th.accent:"rgba(255,255,255,0.4)",fontSize:11,cursor:"pointer",transition:"all .2s"}}>{t==="ALL"?"すべて":t}</button>)}</div>}<GH items={iF} idx={ii} setIdx={setIi} onZoom={zoom} dark showTag th={th}/></>}<div style={{padding:"20px 5vw 0",maxWidth:800,margin:"0 auto"}}><p style={{fontSize:13,lineHeight:2.2,color:"rgba(255,255,255,0.4)",fontWeight:300}}>{data.interior.description}</p></div></div>
+    {data.beforeAfter?.show!==false&&baPairs.length>0&&<PSec bg={th.secBg}><Lb en="BEFORE / AFTER" ja="ビフォーアフター" th={th}/>{baPairs.map((p,i)=><InView key={i} delay={i*100}><div style={{marginBottom:i<baPairs.length-1?44:0}}>{p.label&&<div style={{fontSize:13,color:th.dark,fontWeight:500,marginBottom:14}}>{p.label}</div>}<BASlider before={p.before} after={p.after}/></div></InView>)}</PSec>}
+    {data.viewer3dUrl&&<div style={{background:"#111",padding:"56px 5vw"}}><div style={{maxWidth:800,margin:"0 auto"}}><Lb en="3D WALKTHROUGH" ja="3Dウォークスルー" dark center th={th}/><InView><button onClick={onWt} style={{width:"100%",maxWidth:400,margin:"0 auto",padding:"24px 0",border:`1px solid ${th.accent}40`,borderRadius:16,background:`${th.accent}0A`,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}><div style={{width:56,height:56,borderRadius:"50%",border:`2px solid ${th.accent}50`,display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="22" height="22" viewBox="0 0 24 24" fill={th.accent}><polygon points="5,3 19,12 5,21"/></svg></div><div style={{fontSize:13,color:th.accent,letterSpacing:2,fontWeight:500}}>全画面で3Dビューを開く</div></button></InView></div></div>}
+    <PSec bg="#fff"><Lb en="SPEC" ja="主要仕様" th={th}/><div style={{maxWidth:500}}>{data.specs.filter(s=>s.category).map((s,i)=><InView key={i} delay={i*50}><div style={{display:"flex",padding:"14px 0",borderBottom:i<data.specs.length-1?`1px solid ${th.tagBorder}`:"none",gap:16}}><span style={{fontSize:11,color:"#A09890",fontWeight:500,letterSpacing:2,minWidth:52}}>{s.category}</span><span style={{fontSize:13,color:th.dark,lineHeight:1.8}}>{s.value}</span></div></InView>)}</div></PSec>
+    {data.pricing?.show!==false&&<PSec bg={th.secBg}><Lb en="PRICE" ja="資金計画" th={th}/><div style={{maxWidth:500}}>{data.pricing.items.filter(p=>p.label).map((it,i)=><InView key={i} delay={i*50}><div style={{display:"flex",justifyContent:"space-between",padding:"15px 0",borderBottom:i<data.pricing.items.length-1?`1px solid ${th.tagBorder}`:"none"}}><span style={{fontSize:13,color:"#6B6560"}}>{it.label}</span><span style={{fontSize:14,color:th.dark,fontWeight:500}}>{it.amount||"—"}</span></div></InView>)}{data.pricing.total&&<InView><div style={{marginTop:16,padding:"18px 0",borderTop:`2px solid ${th.dark}`,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:13,color:th.dark,fontWeight:600,letterSpacing:2}}>合計（税込）</span><span style={{fontSize:24,color:th.dark,fontWeight:300}}>{data.pricing.total}</span></div></InView>}{data.pricing.notes&&<InView><div style={{marginTop:14,padding:14,background:th.accentLight,borderRadius:8,fontSize:11,color:"#A09890",lineHeight:2,border:`1px solid ${th.tagBorder}`}}>※ {data.pricing.notes}</div></InView>}</div></PSec>}
+    <PSec bg={th.dark} last><Lb en="CONTACT" ja="お問合せ" dark center th={th}/><InView><div style={{textAlign:"center"}}>
+      <a href={`tel:${data.contact.phone.replace(/-/g,"")}`} style={{fontSize:"clamp(22px, 3.5vw, 30px)",color:"#fff",fontWeight:300,letterSpacing:4,display:"block",marginBottom:8}}>{data.contact.phone}</a>
+      <div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginBottom:36}}>{data.contact.hours}</div>
+      <div style={{width:40,height:1,background:`${th.accent}33`,margin:"0 auto 36px"}}/>
+      <div style={{fontSize:12,color:"rgba(255,255,255,0.22)",letterSpacing:2,lineHeight:2.4}}>喜多ハウジング株式会社<br/>{data.contact.address}</div>
+      {data.staffName&&<div style={{marginTop:24,fontSize:12,color:"rgba(255,255,255,0.35)"}}>担当：{data.staffName}</div>}
+      {data.expiresAt&&<div style={{marginTop:24,fontSize:10,color:"rgba(255,255,255,0.25)",letterSpacing:1}}>閲覧期限：{fmtDateShort(data.expiresAt)}</div>}
+      <div style={{marginTop:48,fontSize:9,color:"rgba(255,255,255,0.1)",letterSpacing:3}}>© 2026 KITA HOUSING CO., LTD.</div>
+    </div></InView></PSec>
+  </>;
+}
+function GH({items,idx,setIdx,onZoom,dark,light,showTag,th}){const a=th?.accent||"#C4956A";const si=items.length>0?idx%items.length:0;const c=items[si];const zl=items.filter(v=>v.image);const zi=c?zl.findIndex(v=>v===c):-1;
+  return<>{items.length>0&&<div style={{position:"relative",width:"100%",maxHeight:"70vh",aspectRatio:"16/10",overflow:"hidden",cursor:c?.image?"pointer":"default",margin:"0 auto"}} onClick={()=>{if(c?.image)onZoom(c.image,c.label,zl.length>1?zl:null,Math.max(0,zi));}}>
+    {c?.image?<img src={iSrc(c.image)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${GR[si%GR.length]})`}}/>}
+    <div style={{position:"absolute",bottom:0,left:0,right:0,height:80,background:light?"linear-gradient(transparent, rgba(245,243,240,0.95))":"linear-gradient(transparent, rgba(20,18,16,0.92))"}}/>
+    <div style={{position:"absolute",bottom:16,left:24}}><div style={{fontSize:9,letterSpacing:3,color:dark?`${a}99`:"#A09890"}}>{si+1}/{items.length}</div><div style={{fontSize:15,color:dark?"#fff":"#2C2420",fontWeight:300,letterSpacing:2,marginTop:2}}>{c?.label}</div></div>
+    {showTag&&c?.tag&&<div style={{position:"absolute",top:14,right:16,fontSize:10,color:"rgba(255,255,255,0.5)",background:"rgba(0,0,0,0.4)",backdropFilter:"blur(8px)",padding:"4px 10px",borderRadius:4}}>{c.tag}</div>}
+    {c?.image&&<div style={{position:"absolute",top:showTag?42:14,[dark?"left":"right"]:16}}><div style={{background:"rgba(0,0,0,0.3)",backdropFilter:"blur(6px)",borderRadius:16,padding:"5px 10px",display:"flex",alignItems:"center",gap:4}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg><span style={{fontSize:9,color:"rgba(255,255,255,0.8)"}}>拡大</span></div></div>}
+  </div>}
+  {items.length>1&&(items.length<=8
+    ?<div style={{display:"flex",gap:6,padding:"14px 20px",overflowX:"auto",justifyContent:"center"}}>{items.map((v,i)=><button key={i} onClick={()=>setIdx(i)} style={{flexShrink:0,width:100,height:70,borderRadius:8,overflow:"hidden",border:"none",padding:0,cursor:"pointer",outline:si===i?`2px solid ${a}`:"2px solid transparent",outlineOffset:-2,opacity:si===i?1:0.4,transition:"all .25s",background:"none"}}>{v.image?<img src={iSrc(v.image)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${GR[i%GR.length]})`,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:9,color:"rgba(255,255,255,0.7)"}}>{v.label}</span></div>}</button>)}</div>
+    :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(80px, 1fr))",gap:3,padding:3,maxWidth:800,margin:"0 auto"}}>{items.map((v,i)=><button key={i} onClick={()=>setIdx(i)} style={{aspectRatio:"4/3",borderRadius:4,overflow:"hidden",border:"none",padding:0,cursor:"pointer",position:"relative",opacity:si===i?1:0.45,background:"none",outline:si===i?`2px solid ${a}`:"2px solid transparent",outlineOffset:-2,transition:"all .25s"}}>{v.image?<img src={iSrc(v.image)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${GR[i%GR.length]})`}}/>}<div style={{position:"absolute",bottom:0,left:0,right:0,padding:"10px 4px 2px",background:"linear-gradient(transparent, rgba(0,0,0,0.65))"}}><div style={{fontSize:7,color:"rgba(255,255,255,0.85)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.label}</div></div></button>)}</div>)}</>;
+}
+function LightBox({src,label,list,index,onClose,onChange}){const[sc,setSc]=useState(1);const[tx,setTx]=useState(0);const[ty,setTy]=useState(0);const ld=useRef(0);const ps=useRef(null);const sp=useRef({tx:0,ty:0});const sx=useRef(0);const hl=list&&list.length>1;
+  const reset=()=>{setSc(1);setTx(0);setTy(0);};
+  const onTS=useCallback(e=>{if(e.touches.length===2)ld.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);else if(e.touches.length===1){ps.current={x:e.touches[0].clientX,y:e.touches[0].clientY};sp.current={tx,ty};sx.current=0;}},[tx,ty]);
+  const onTM=useCallback(e=>{e.preventDefault();if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(ld.current>0){const ns=Math.min(Math.max(sc*(d/ld.current),1),5);setSc(ns);if(ns<=1){setTx(0);setTy(0);}}ld.current=d;}else if(e.touches.length===1&&ps.current){const dx=e.touches[0].clientX-ps.current.x,dy=e.touches[0].clientY-ps.current.y;if(sc>1){setTx(sp.current.tx+dx);setTy(sp.current.ty+dy);}else sx.current=dx;}},[sc]);
+  const onTE=useCallback(()=>{ld.current=0;if(sc<=1&&hl&&Math.abs(sx.current)>60){const d=sx.current>0?-1:1,ni=index+d;if(ni>=0&&ni<list.length){reset();onChange({src:list[ni].image,label:list[ni].label,list,index:ni});}}ps.current=null;sx.current=0;},[sc,hl,index,list,onChange]);
+  const dt=useRef(0);const tap=()=>{const n=Date.now();if(n-dt.current<300){sc>1?reset():setSc(2.5);dt.current=0;}else dt.current=n;};
+  const go=d=>{if(hl){const ni=index+d;if(ni>=0&&ni<list.length){reset();onChange({src:list[ni].image,label:list[ni].label,list,index:ni});}}};
+  return<div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,0.97)",display:"flex",flexDirection:"column",touchAction:"none"}} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onClick={tap}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",flexShrink:0,zIndex:2}}><button onClick={e=>{e.stopPropagation();onClose();}} style={{background:"none",border:"none",color:"#fff",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>閉じる</button>{hl&&<div style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>{index+1}/{list.length}</div>}<div style={{width:48}}/></div>
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative"}}>{src&&<img src={iSrc(src)} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",transition:sc===1?"transform 0.2s":"none",transform:`translate(${tx}px,${ty}px) scale(${sc})`,userSelect:"none",pointerEvents:"none"}}/>}
+      {hl&&index>0&&<button onClick={e=>{e.stopPropagation();go(-1);}} style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,0.4)",border:"none",borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg></button>}
+      {hl&&index<list.length-1&&<button onClick={e=>{e.stopPropagation();go(1);}} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,0.4)",border:"none",borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg></button>}
+    </div>
+    <div style={{textAlign:"center",padding:"12px 20px 20px"}}>{label&&<div style={{fontSize:14,color:"rgba(255,255,255,0.7)",letterSpacing:2}}>{label}</div>}<div style={{fontSize:10,color:"rgba(255,255,255,0.25)",marginTop:6}}>{sc>1?"ダブルタップでリセット":hl?"スワイプで前後 / ダブルタップで拡大":"ダブルタップで拡大"}</div></div>
+  </div>;}
+function WT({url,onClose}){useEffect(()=>{const el=document.documentElement;if(el.requestFullscreen)el.requestFullscreen().catch(()=>{});return()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});};},[]);
+  return<div style={{position:"fixed",inset:0,zIndex:9999,background:"#000"}}><iframe src={url} style={{width:"100%",height:"100%",border:"none"}} title="3D" allow="fullscreen; gyroscope; accelerometer"/><button onClick={onClose} style={{position:"absolute",top:12,left:12,zIndex:10,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(12px)",border:"1px solid rgba(255,255,255,0.1)",color:"#fff",borderRadius:24,padding:"8px 16px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>閉じる</button></div>;}
+
+const S={
+  shell:{width:"100%",maxWidth:640,margin:"0 auto",height:"100%",background:"#FAF8F5",position:"relative",overflow:"hidden",display:"flex",flexDirection:"column"},
+  eH:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid #EDEAE6",background:"#fff",flexShrink:0},
+  smB:{border:"none",borderRadius:6,padding:"7px 11px",fontSize:11,fontWeight:500,cursor:"pointer",letterSpacing:1},
+  fl:{fontSize:11,color:"#8B8580",fontWeight:500,marginBottom:5,letterSpacing:1},
+  inp:{width:"100%",padding:"10px 12px",border:"1px solid #E5E0DA",borderRadius:7,fontSize:13,color:"#2C2420",background:"#fff",outline:"none",lineHeight:1.6},
+  aB:{width:"100%",padding:"10px 0",border:"1px dashed #D5D0CA",borderRadius:7,background:"none",fontSize:11,color:"#A09890",cursor:"pointer"},
+  xB:{background:"none",border:"none",color:"#CCC5BE",fontSize:14,cursor:"pointer",padding:4},
+  mvB:{background:"none",border:"1px solid #E5E0DA",borderRadius:4,width:22,height:22,fontSize:10,color:"#A09890",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0},
+  bulkBtn:{width:"100%",padding:"14px 0",border:"2px dashed #C4956A",borderRadius:8,background:"rgba(196,149,106,0.04)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:12,color:"#C4956A",fontWeight:500},
+  sc:{flex:1,overflowY:"auto",scrollBehavior:"smooth",WebkitOverflowScrolling:"touch",minHeight:0},
+  bk:{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",zIndex:100,background:"rgba(44,36,32,0.85)",backdropFilter:"blur(12px)",color:"#fff",border:"none",borderRadius:20,padding:"8px 16px",fontSize:11,fontWeight:500,cursor:"pointer"},
+  bd:{fontSize:"clamp(13px, 1.5vw, 15px)",lineHeight:2.4,color:"#6B6560",fontWeight:300},
+  tg:{padding:"16px 12px",background:"#fff",borderRadius:10,textAlign:"center",fontSize:12,color:"#2C2420",fontWeight:500,letterSpacing:2,boxShadow:"0 2px 12px rgba(0,0,0,0.03)",border:"1px solid #F0EDE8"},
+  shareBtn:{width:"100%",padding:"14px 0",border:"none",borderRadius:10,fontSize:13,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10},
+};
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
