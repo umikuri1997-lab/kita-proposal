@@ -3,21 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>喜多ハウジング | ツール</title>
+<title>喜多ハウジング | 業務ポータル</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232C2420'/><text x='50' y='68' font-size='54' text-anchor='middle' fill='%23C4956A' font-family='sans-serif' font-weight='bold'>K</text></svg>">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #F5F3F0; color: #2C2420; min-height: 100vh; }
 
 header {
   background: #2C2420;
-  color: #fff;
   padding: 16px 24px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
-header .logo { font-size: 13px; letter-spacing: 3px; color: #C4956A; font-weight: 400; }
-header .title { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.7); }
+.logo { font-size: 13px; letter-spacing: 3px; color: #C4956A; }
+.sep { color: rgba(255,255,255,0.2); }
+.htitle { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.7); }
 
 main { padding: 32px 24px; max-width: 800px; margin: 0 auto; }
 
@@ -49,28 +50,7 @@ h2:first-child { margin-top: 0; }
 .tool-info { flex: 1; min-width: 0; }
 .tool-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
 .tool-desc { font-size: 12px; color: #8B8580; line-height: 1.6; }
-
-.tool-badge {
-  font-size: 10px; font-weight: 500; padding: 3px 10px;
-  border-radius: 100px; flex-shrink: 0; letter-spacing: 1px;
-}
-.badge-local { background: #F5EDE5; color: #C4956A; border: 1px solid #E8D5C0; }
-.badge-web   { background: #EDF3EE; color: #5F7F67; border: 1px solid #C0D8C8; }
-
 .tool-arrow { color: #C5BFB8; font-size: 18px; flex-shrink: 0; }
-
-.note {
-  margin-top: 32px;
-  padding: 14px 18px;
-  background: #fff;
-  border: 1px solid #E5E0DA;
-  border-left: 3px solid #C4956A;
-  border-radius: 8px;
-  font-size: 12px;
-  color: #8B8580;
-  line-height: 1.9;
-}
-.note strong { color: #2C2420; font-weight: 600; }
 
 footer {
   text-align: center;
@@ -85,8 +65,8 @@ footer {
 
 <header>
   <span class="logo">KITA HOUSING</span>
-  <span style="color:rgba(255,255,255,0.2)">|</span>
-  <span class="title">提案ツール</span>
+  <span class="sep">|</span>
+  <span class="htitle">業務ポータル</span>
 </header>
 
 <main>
@@ -94,23 +74,21 @@ footer {
   <h2>提案書ツール</h2>
   <div class="tools">
 
-    <a href="./proposal/reform-editor_v2.html" class="tool">
+    <a href="./proposal/index.html" class="tool">
       <div class="tool-icon" style="background:#F5EDE5;">📋</div>
       <div class="tool-info">
         <div class="tool-name">リフォームプラン提案書</div>
         <div class="tool-desc">複数プランの比較・間取り図・A3 PDF出力 / お客様共有URL発行</div>
       </div>
-      <span class="tool-badge badge-local">ローカル</span>
       <span class="tool-arrow">›</span>
     </a>
 
-    <a href="./contract/index_v2.html" class="tool">
+    <a href="./contract/index.html" class="tool">
       <div class="tool-icon" style="background:#EDF3EE;">📄</div>
       <div class="tool-info">
         <div class="tool-name">ご契約提案書</div>
         <div class="tool-desc">外観・内装・B/A・資金計画・仕様を一括管理 / お客様共有URL発行</div>
       </div>
-      <span class="tool-badge badge-web">Web</span>
       <span class="tool-arrow">›</span>
     </a>
 
@@ -125,16 +103,9 @@ footer {
         <div class="tool-name">3D ウォークスルー</div>
         <div class="tool-desc">GLBファイルをアップロードしてリアルタイム3Dビューア表示</div>
       </div>
-      <span class="tool-badge badge-web">Web</span>
       <span class="tool-arrow">›</span>
     </a>
 
-  </div>
-
-  <div class="note">
-    <strong>ローカル</strong> … HTMLファイルをダウンロードしてブラウザで開いて使用<br>
-    <strong>Web</strong> … GitHub Pages でホストされているためURLで直接アクセス可能<br>
-    画像データ・物件データはすべて <strong>Cloudflare</strong> に保存されます（共通）
   </div>
 
 </main>
